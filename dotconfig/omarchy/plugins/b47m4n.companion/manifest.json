@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "b47m4n.companion",
+  "name": "AI Agent Companion",
+  "version": "1.0.0",
+  "description": "Batman & Robin dynamic floating agent companion for AGY & CMD.",
+  "kinds": [
+    "panel"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "panel": "Companion.qml"
+  }
+}

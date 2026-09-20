@@ -1,0 +1,121 @@
+================================================================================
+SYSTEM STATE SNAPSHOT
+Generated: 2026-09-11T21:42:56+05:30
+Hostname: omarchy
+User: b47m4n
+================================================================================
+
+[1. OS & KERNEL]
+Kernel: 7.1.8-1-cachyos
+Architecture: x86_64
+Uptime: up 3 minutes
+OS: Omarchy
+
+[2. CPU & MEMORY]
+CPU Model: 13th Gen Intel(R) Core(TM) i7-13700HX
+Cores/Threads: 24
+Memory Usage:
+               total        used        free      shared  buff/cache   available
+Mem:            15Gi       4.9Gi       6.6Gi       601Mi       5.4Gi        10Gi
+Swap:           30Gi       4.3Mi        30Gi
+
+[3. STORAGE & FILESYSTEMS]
+NAME            SIZE FSTYPE      TYPE  MOUNTPOINTS
+loop0          91.7M squashfs    loop  /var/lib/snapd/snap/gtk-common-themes/1535
+loop1         531.5M squashfs    loop  /var/lib/snapd/snap/gnome-42-2204/263
+loop2         531.4M squashfs    loop  /var/lib/snapd/snap/gnome-42-2204/247
+loop3          50.3M squashfs    loop  /var/lib/snapd/snap/snapd/27738
+loop4          50.1M squashfs    loop  /var/lib/snapd/snap/snapd/27710
+loop5            74M squashfs    loop  /var/lib/snapd/snap/core22/2437
+loop6           1.3G squashfs    loop  /var/lib/snapd/snap/autopsy/4
+loop7             4K squashfs    loop  /var/lib/snapd/snap/bare/5
+loop8            74M squashfs    loop  /var/lib/snapd/snap/core22/2411
+zram0          15.3G swap        disk  [SWAP]
+nvme0n1       953.9G             disk  
+├─nvme0n1p1     450M vfat        part  
+├─nvme0n1p2      16M             part  
+├─nvme0n1p3   655.9G ntfs        part  
+├─nvme0n1p4       2G ntfs        part  
+├─nvme0n1p5       1G vfat        part  /boot
+└─nvme0n1p6   294.6G crypto_LUKS part  
+  └─cryptroot 294.6G btrfs       crypt /var/log
+                                       /home
+                                       /var/cache/pacman/pkg
+                                       /
+
+Disk Space:
+Filesystem             Size  Used Avail Use% Mounted on
+efivarfs               268K  169K   95K  65% /sys/firmware/efi/efivars
+/dev/mapper/cryptroot  295G  199G   93G  69% /
+/dev/mapper/cryptroot  295G  199G   93G  69% /var/cache/pacman/pkg
+/dev/mapper/cryptroot  295G  199G   93G  69% /home
+/dev/mapper/cryptroot  295G  199G   93G  69% /var/log
+/dev/loop7             128K  128K     0 100% /var/lib/snapd/snap/bare/5
+/dev/nvme0n1p5        1022M  781M  242M  77% /boot
+/dev/loop8              74M   74M     0 100% /var/lib/snapd/snap/core22/2411
+/dev/loop4              51M   51M     0 100% /var/lib/snapd/snap/snapd/27710
+/dev/loop3              51M   51M     0 100% /var/lib/snapd/snap/snapd/27738
+/dev/loop0              92M   92M     0 100% /var/lib/snapd/snap/gtk-common-themes/1535
+/dev/loop6             1.4G  1.4G     0 100% /var/lib/snapd/snap/autopsy/4
+/dev/loop2             532M  532M     0 100% /var/lib/snapd/snap/gnome-42-2204/247
+/dev/loop5              74M   74M     0 100% /var/lib/snapd/snap/core22/2437
+/dev/loop1             532M  532M     0 100% /var/lib/snapd/snap/gnome-42-2204/263
+
+[4. DESKTOP & THEME]
+Desktop: Hyprland (Hyprland 0.56.2 built from branch v0.56.2 at commit efb50993780079460b0cbed1363e2166a2de1d9f clean ([gha] Nix: update inputs).)
+Omarchy Theme: Unknown
+Monitors:
+Monitor eDP-2 (ID 0):
+	description: BOE 0x0C29 0x00000067
+
+[5. GPU STATUS]
+00:02.0 VGA compatible controller: Intel Corporation Alder Lake-HX GT1 [UHD Graphics 770] (rev 0c)
+01:00.0 VGA compatible controller: NVIDIA Corporation GB207M [GeForce RTX 5050 Max-Q / Mobile] (rev a1)
+name, driver_version, memory.total [MiB], memory.used [MiB], memory.free [MiB]
+NVIDIA GeForce RTX 5050 Laptop GPU, 610.57.04, 8151 MiB, 5 MiB, 7743 MiB
+
+[6. PACKAGES SUMMARY]
+Total Native Packages: 272
+Total AUR Packages: 11
+Total Packages: 283
+Flatpaks: 0
+
+[7. SYSTEMD STATUS]
+Failed System Units:
+
+Failed User Units:
+
+
+[8. NETWORK INTERFACES]
+lo               UNKNOWN        127.0.0.1/8 ::1/128 
+enp7s0           DOWN           
+wlp8s0           UP             192.168.18.33/24 fe80::e243:ead0:ed60:21e4/64 
+vmnet1           UNKNOWN        172.16.195.1/24 fe80::250:56ff:fec0:1/64 
+vmnet8           UNKNOWN        172.16.206.1/24 fe80::250:56ff:fec0:8/64 
+
+[9. ACTIVE PROCESSES SUMMARY (TOP 10 BY CPU & MEMORY)]
+Top CPU:
+    PID    PPID CMD                         %CPU %MEM
+  15328   13628 agy                          209  1.8
+   2049    2040 quickshell -n -p /usr/share 23.5  2.9
+   8435    8352 /opt/google/chrome/chrome - 15.8  4.3
+   1885    1875 Hyprland --watchdog-fd 4    12.3  1.3
+   8528    1504 /usr/lib/localsearch-3       8.6  0.4
+   8381    8349 /opt/google/chrome/chrome -  4.7  1.1
+   8211    1504 /opt/google/chrome/chrome -  3.8  2.3
+  16205    8528 /usr/lib/localsearch-extrac  3.0  0.2
+   1495       1 /home/b47m4n/Downloads/file  2.6  0.0
+  13597    1885 /usr/bin/kitty --working-di  1.5  1.0
+
+Top Memory:
+    PID    PPID CMD                         %CPU %MEM
+   8435    8352 /opt/google/chrome/chrome - 15.8  4.3
+   2049    2040 quickshell -n -p /usr/share 23.5  2.9
+   8211    1504 /opt/google/chrome/chrome -  3.8  2.3
+  15328   13628 agy                          209  1.8
+   2556    1504 /opt/1Password/1password --  0.4  1.6
+   1885    1875 Hyprland --watchdog-fd 4    12.3  1.3
+   8381    8349 /opt/google/chrome/chrome -  4.7  1.1
+  13597    1885 /usr/bin/kitty --working-di  1.5  1.0
+   8414    8352 /opt/google/chrome/chrome -  0.1  0.9
+   8423    8352 /opt/google/chrome/chrome -  0.6  0.9

@@ -1,0 +1,16 @@
+{
+  "monitors": {
+    "eDP-2": {
+      "mode": "1920x1080@144.00Hz",
+      "position": "0x0",
+      "scale": 1,
+      "transform": 0
+    }
+  },
+  "terminals": {
+    "foot": 13,
+    "ghostty": 13,
+    "alacritty": 13,
+    "kitty": 13
+  }
+}

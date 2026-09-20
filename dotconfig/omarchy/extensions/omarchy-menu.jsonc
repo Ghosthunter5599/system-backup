@@ -1,0 +1,20 @@
+{
+  // Extend the Quickshell Omarchy menu with JSONC.
+
+  // Antigravity (AGY) option under Default Agent menu
+  "setup.default.agent.agy": {
+    "icon": "󰚩",
+    "label": "Antigravity (AGY)",
+    "checked": "[[ \"$($HOME/.local/bin/omarchy-default-agent)\" == \"agy\" ]]",
+    "action": "omarchy-default-agent agy"
+  },
+
+  // Override Gemini option to use AGY instead of outdated gemini-cli
+  "setup.default.agent.gemini": {
+    "icon": "󰫢",
+    "label": "Gemini (AGY)",
+    "checked": "[[ \"$($HOME/.local/bin/omarchy-default-agent)\" == \"agy\" ]]",
+    "action": "omarchy-default-agent agy"
+  }
+}
+

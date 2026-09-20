@@ -1,0 +1,29 @@
+import QtQuick
+import qs.Commons
+import qs.Ui
+
+// Bar icon for the plugin-manager panel. Clicking runs the exact same IPC
+// route the SUPER+ALT+P keybinding uses (omarchy-shell shell toggle …),
+// mirroring the sibling nosignal.* widgets. Static icon only — no polling.
+BarWidget {
+  id: root
+  moduleName: "nosignal.plugin-manager"
+
+  implicitWidth: button.implicitWidth
+  implicitHeight: button.implicitHeight
+
+  WidgetButton {
+    id: button
+    anchors.fill: parent
+    bar: root.bar
+    text: "󰐱"
+    tooltipText: "Plugin manager"
+    foreground: Color.accent
+    fixedWidth: root.bar && root.bar.vertical ? -1 : Style.space(27)
+    fixedHeight: root.bar && root.bar.vertical ? Style.space(26) : -1
+    onPressed: function(b) {
+      if (!root.bar) return
+      root.bar.run("omarchy-shell shell toggle nosignal.plugin-manager")
+    }
+  }
+}

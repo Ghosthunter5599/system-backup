@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.shivamnarkar47.omarchy-hotspot",
+  "name": "Mobile Hotspot",
+  "version": "1.0.0",
+  "author": "Shivam Narkar",
+  "description": "Mobile hotspot toggle: serves a Wi-Fi AP (OmarchyHotspot) while the current connection stays up",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "plugin/Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Mobile Hotspot",
+    "description": "Toggle the OmarchyHotspot Wi-Fi AP; the station connection is never dropped",
+    "category": "Network",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

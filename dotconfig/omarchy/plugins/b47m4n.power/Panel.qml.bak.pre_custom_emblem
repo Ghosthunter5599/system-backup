@@ -1,0 +1,902 @@
+import QtQuick
+import QtQuick.Effects
+import Quickshell
+import Quickshell.Io
+import Quickshell.Services.UPower
+import qs.Commons
+import qs.Ui
+import "Model.js" as Model
+
+Panel {
+  id: root
+  moduleName: "omarchy.power"
+  ipcTarget: "omarchy.power"
+  // manageIpc: false so this panel can own the single IpcHandler the target
+  // permits — needed for the togglePercentage method below.
+  manageIpc: false
+  property var batteryInfo: ({})
+  property var systemInfo: ({})
+  property var profiles: []
+  property string activeProfile: ""
+  property int profileIndex: 0
+  property bool cursorActive: false
+  readonly property bool showPercentage: setting("showPercentage", false) === true
+  // With the percentage shown the button paints a text block wider than an
+  // icon, so the open-panel mark takes the painted width instead of the
+  // icon-sized fraction of the slot the fallback assumes.
+  readonly property real openPanelIndicatorWidth: showPercentage && !button.vertical ? button.glyphPaintedWidth : 0
+  readonly property bool batteryPresent: {
+    var device = UPower.displayDevice
+    return !!(device && device.isPresent)
+  }
+
+  function upowerStates() {
+    return {
+      Charging: UPowerDeviceState.Charging,
+      Discharging: UPowerDeviceState.Discharging,
+      FullyCharged: UPowerDeviceState.FullyCharged,
+      PendingCharge: UPowerDeviceState.PendingCharge
+    }
+  }
+
+  function selectProfileByDelta(delta) {
+    profileIndex = Model.selectProfileIndex(profileIndex, delta, profiles)
+  }
+
+  function activateSelectedProfile() {
+    if (profileIndex < 0 || profileIndex >= profiles.length) return
+    setProfile(profiles[profileIndex])
+  }
+
+  function batteryIcon() {
+    var device = UPower.displayDevice
+    return Model.batteryIcon(device, root.discharging, upowerStates())
+  }
+
+  function modeLabel() {
+    var device = UPower.displayDevice
+    return Model.modeLabel(device, root.discharging, upowerStates())
+  }
+
+  function profileIcon(name) {
+    return Model.profileIcon(name)
+  }
+
+  readonly property bool fullyCharged: {
+    var device = UPower.displayDevice
+    return device && device.isPresent && device.state === UPowerDeviceState.FullyCharged && !root.chargeThresholdActive
+  }
+  readonly property bool discharging: {
+    var device = UPower.displayDevice
+    return !!(device && device.isPresent && UPower.onBattery)
+  }
+  readonly property bool chargeThresholdActive: {
+    var device = UPower.displayDevice
+    return Model.chargeThresholdActive(device, root.discharging, upowerStates())
+  }
+  readonly property bool batteryFull: fullyCharged || (!root.discharging && batteryFraction >= 1)
+  readonly property bool batteryFlowIdle: batteryFull || chargeThresholdActive
+
+  // 0..1 charge level, used by the visual progress bar.
+  readonly property real batteryFraction: {
+    var d = UPower.displayDevice
+    return Model.batteryFraction(d)
+  }
+
+  readonly property bool charging: {
+    var d = UPower.displayDevice
+    return d && d.isPresent && !UPower.onBattery && !root.batteryFlowIdle
+  }
+
+  readonly property color batteryFillColor: {
+    return root.bar ? root.bar.foreground : Color.foreground
+  }
+
+  // Cute agent-flavored phrases shown in the hero status line, rotated on a
+  // timer so the panel feels alive when current is flowing (either direction).
+  readonly property var chargingPhrases: [
+    "Pumping power",
+    "Injecting electrons",
+    "Pouring juice",
+    "Amassing watts",
+    "Hoarding joules",
+    "Sucking volts",
+    "Topping reserves",
+    "Soaking amps",
+    "Inhaling kilowatts"
+  ]
+  readonly property var onBatteryPhrases: [
+    "Slurping power",
+    "Spending joules",
+    "Draining watts",
+    "Burning electrons",
+    "Sipping juice",
+    "Spending coulombs",
+    "Bleeding amps",
+    "Guzzling volts",
+    "Munching reserves"
+  ]
+  property int phraseIndex: 0
+
+  // Whichever list is "active" given the current power state.
+  readonly property var activePhrases: {
+    if (fullyCharged) return []
+    if (charging) return chargingPhrases
+    if (discharging) return onBatteryPhrases
+    return []
+  }
+  readonly property bool rotatingPhrases: activePhrases.length > 0
+
+  readonly property string heroStatusText: {
+    if (fullyCharged) return "Fully charged"
+    if (rotatingPhrases) return activePhrases[phraseIndex % activePhrases.length]
+    return modeLabel()
+  }
+
+  function refresh() {
+    if (!batteryPresent) return
+
+    if (!batteryProc.running) batteryProc.running = true
+    if (!profilesProc.running) profilesProc.running = true
+    if (!systemProc.running) systemProc.running = true
+  }
+
+  function updateKeyValue(raw, targetName) {
+    var next = Model.parseKeyValue(raw)
+    // Keep last known good data if a refresh briefly returns nothing — happens
+    // around AC plug/unplug events. Avoids the section collapsing mid-transition.
+    if (Object.keys(next).length === 0) return
+    if (targetName === "battery") batteryInfo = next
+    else systemInfo = next
+  }
+
+  function updateProfiles(raw) {
+    var parsed = Model.parseProfiles(raw, profileIndex)
+    // Same guard as battery: preserve the last known profile list across
+    // transient empty payloads so the buttons don't blink out.
+    if (parsed.profiles.length === 0) return
+    profiles = parsed.profiles
+    activeProfile = parsed.activeProfile
+    profileIndex = parsed.profileIndex
+    if (opened && !cursorActive) {
+      var idx = profiles.indexOf(activeProfile)
+      if (idx >= 0) profileIndex = idx
+    }
+  }
+
+  function setProfile(profile) {
+    if (!profile || actionProc.running) return
+    actionProc.command = ["omarchy-powerprofiles-set", root.discharging ? "battery" : "ac", profile]
+    actionProc.running = true
+  }
+
+  function togglePercentage() {
+    root.settings = Object.assign({}, root.settings, { showPercentage: !root.showPercentage })
+    if (root.bar && root.bar.shell) root.bar.shell.updateEntryInline(root.moduleName, root.settings)
+  }
+
+  IpcHandler {
+    target: "omarchy.power"
+
+    function open() { root.open() }
+    function close() { root.close() }
+    function show() { root.open() }
+    function hide() { root.close() }
+    function toggle() { root.toggle() }
+    function togglePercentage() { root.togglePercentage() }
+  }
+
+  onOpenedChanged: {
+    if (opened) {
+      if (!batteryPresent) {
+        close()
+        return
+      }
+
+      refresh()
+      var idx = profiles.indexOf(activeProfile)
+      profileIndex = idx >= 0 ? idx : 0
+      cursorActive = false
+    }
+  }
+
+  onBatteryPresentChanged: if (!batteryPresent) close()
+
+  visible: batteryPresent
+  implicitWidth: batteryPresent ? button.implicitWidth : 0
+  implicitHeight: batteryPresent ? button.implicitHeight : 0
+
+  Process {
+    id: batteryProc
+    command: ["omarchy-battery-status", "--shell"]
+    stdout: StdioCollector { waitForEnd: true; onStreamFinished: root.updateKeyValue(text, "battery") }
+  }
+
+  Process {
+    id: profilesProc
+    command: ["omarchy-powerprofiles-list", "--active-state"]
+    stdout: StdioCollector { waitForEnd: true; onStreamFinished: root.updateProfiles(text) }
+  }
+
+  Process {
+    id: systemProc
+    command: ["omarchy-system-stats"]
+    stdout: StdioCollector { waitForEnd: true; onStreamFinished: root.updateKeyValue(text, "system") }
+  }
+
+  Process {
+    id: actionProc
+    onExited: root.refresh()
+  }
+
+  Timer { interval: 5000; running: root.opened; repeat: true; onTriggered: root.refresh() }
+
+  // Rotate the status phrase while the panel is open and we're in a
+  // rotating state (charging or on battery). The text swap is wrapped in a
+  // fade so the changeover reads as one organism rather than a hard cut.
+  Timer {
+    id: phraseTimer
+    interval: 2800
+    running: root.opened && root.rotatingPhrases
+    repeat: true
+    triggeredOnStart: false
+    onTriggered: phraseSwap.restart()
+  }
+
+  SequentialAnimation {
+    id: phraseSwap
+    PropertyAnimation {
+      target: heroStatus; property: "opacity"
+      to: 0.0; duration: 180; easing.type: Easing.OutQuad
+    }
+    ScriptAction {
+      script: {
+        var n = root.activePhrases.length
+        if (n > 0) root.phraseIndex = (root.phraseIndex + 1) % n
+      }
+    }
+    PropertyAnimation {
+      target: heroStatus; property: "opacity"
+      to: 1.0; duration: 260; easing.type: Easing.InQuad
+    }
+  }
+
+  // If we leave a rotating state mid-swap, halt the animation and snap back
+  // to full opacity so "FULLY CHARGED" is legible immediately rather than
+  // appearing dimmed.
+  Connections {
+    target: root
+    function onRotatingPhrasesChanged() {
+      if (!root.rotatingPhrases) {
+        phraseSwap.stop()
+        heroStatus.opacity = 1.0
+      }
+    }
+  }
+
+  WidgetButton {
+    id: button
+    anchors.fill: parent
+    bar: root.bar
+    labelVisible: false
+    hasVisualContent: true
+    fontSize: Style.bar.iconFont
+    readonly property real slotSize: Style.bar.iconSlot * (root.showPercentage && !vertical ? 2 : 1)
+    readonly property real glyphPaintedWidth: batteryVisual.implicitWidth
+    fixedWidth: vertical ? -1 : (root.showPercentage ? Math.max(slotSize, Math.round(batteryVisual.implicitWidth + scaledHorizontalMargin * 2)) : slotSize)
+    fixedHeight: vertical ? (root.showPercentage ? Math.max(slotSize, Math.round(batteryVisual.implicitHeight + scaledVerticalPadding * 2)) : slotSize) : -1
+    horizontalMargin: 8.5
+    tooltipText: ""
+    onPressed: function(b) {
+      if (!root.batteryPresent) return
+      if (b === Qt.RightButton) root.togglePercentage()
+      else root.toggle()
+    }
+
+    Item {
+      id: batteryVisual
+      anchors.centerIn: parent
+      width: contentRow.implicitWidth
+      height: contentRow.implicitHeight
+      implicitWidth: contentRow.implicitWidth
+      implicitHeight: contentRow.implicitHeight
+
+      readonly property real grapplerWidth: 26.0
+      readonly property real grapplerHeight: Math.max(13, Math.round(Style.font.body * 1.05))
+
+      readonly property color glowColor: {
+        if (button.active && button.useActiveColor) return button.activeColor
+        if (root.charging) return Qt.lighter(Color.accent, 1.35)
+        if (root.discharging && root.batteryFraction <= 0.2) return Color.urgent
+        return Qt.lighter(Color.accent, 1.1)
+      }
+
+      readonly property color bavariumColor: {
+        if (button.active && button.useActiveColor) return button.activeColor
+        if (root.charging) return Color.accent
+        if (root.discharging && root.batteryFraction <= 0.2) return Color.urgent
+        return Color.accent
+      }
+
+      // ⚡ Charging: Rotary Winch Cable Spool Spin (ACTIVE ONLY WHEN CHARGING)
+      property real winchSpinAngle: 0.0
+      NumberAnimation on winchSpinAngle {
+        running: root.charging
+        loops: Animation.Infinite
+        from: 0.0
+        to: 360.0
+        duration: 650
+      }
+
+      // ⚡ Charging: High-Speed Tether Laser Beam / Cable Pulses (ACTIVE ONLY WHEN CHARGING)
+      property real tetherPhase: 0.0
+      NumberAnimation on tetherPhase {
+        running: root.charging
+        loops: Animation.Infinite
+        from: 0.0
+        to: 1.0
+        duration: 550
+      }
+
+      // ⚡ Charging: Scorpion Pincer Claws Hydraulic Flex/Pulse (ACTIVE ONLY WHEN CHARGING)
+      property real clawFlex: 0.0
+      SequentialAnimation on clawFlex {
+        running: root.charging && !button.tooltipHovered && !button.active
+        loops: Animation.Infinite
+        NumberAnimation { from: 0.0; to: 1.0; duration: 380; easing.type: Easing.InOutSine }
+        NumberAnimation { from: 1.0; to: 0.0; duration: 380; easing.type: Easing.InOutSine }
+      }
+
+      // ⚡ Charging: Bavarium Overdrive Energy Bloom (ACTIVE ONLY WHEN CHARGING)
+      property real chargePulse: 0.5
+      SequentialAnimation on chargePulse {
+        running: root.charging && !button.tooltipHovered && !button.active
+        loops: Animation.Infinite
+        NumberAnimation { from: 0.35; to: 1.0; duration: 700; easing.type: Easing.InOutSine }
+        NumberAnimation { from: 1.0; to: 0.35; duration: 700; easing.type: Easing.InOutSine }
+      }
+
+      // 🚨 Low Battery Cable Overload Warning Strobe
+      property real warningStrobe: 1.0
+      SequentialAnimation on warningStrobe {
+        running: root.discharging && root.batteryFraction <= 0.2
+        loops: Animation.Infinite
+        NumberAnimation { from: 1.0; to: 0.2; duration: 240; easing.type: Easing.InOutQuad }
+        NumberAnimation { from: 0.2; to: 1.0; duration: 240; easing.type: Easing.InOutQuad }
+      }
+
+      Row {
+        id: contentRow
+        anchors.centerIn: parent
+        spacing: 6
+        layoutDirection: Qt.LeftToRight
+
+        // Percentage Text (Always visible on horizontal bar to show exact percent)
+        Text {
+          id: percentLabel
+          visible: !button.vertical
+          anchors.verticalCenter: parent.verticalCenter
+          text: Math.round(root.batteryFraction * 100) + "%"
+          font.family: button.fontFamily
+          font.pixelSize: Math.max(9, Math.round(batteryVisual.grapplerHeight * 0.92))
+          font.bold: true
+          color: button.active && button.useActiveColor ? button.activeColor : (root.charging ? Qt.lighter(Color.accent, 1.2) : button.foreground)
+          renderType: Text.NativeRendering
+
+          Behavior on color { ColorAnimation { duration: 160 } }
+        }
+
+        // Just Cause 3: Protec Grappler G3 Hook & Winch Widget
+        Item {
+          id: grapplerWidget
+          anchors.verticalCenter: parent.verticalCenter
+          width: batteryVisual.grapplerWidth
+          height: batteryVisual.grapplerHeight
+          implicitWidth: batteryVisual.grapplerWidth
+          implicitHeight: batteryVisual.grapplerHeight
+
+          // Ambient Bavarium Glow Bloom
+          Rectangle {
+            anchors.centerIn: parent
+            width: parent.width + (root.charging ? 8 : 4)
+            height: parent.height + (root.charging ? 6 : 2)
+            radius: 3
+            color: batteryVisual.glowColor
+            opacity: {
+              if (button.tooltipHovered || button.active) return 0.52
+              if (root.charging) return batteryVisual.chargePulse * 0.45
+              if (root.discharging && root.batteryFraction <= 0.2) return batteryVisual.warningStrobe * 0.48
+              return 0.08
+            }
+            visible: opacity > 0.03
+
+            Behavior on opacity {
+              enabled: button.tooltipHovered || button.active || !root.charging
+              NumberAnimation { duration: 220 }
+            }
+          }
+
+          // ⚡ Charging: High-Velocity Bavarium Tether Laser Beams (Shooting forward from Dart tip)
+          Repeater {
+            model: root.charging ? 2 : 0
+            Rectangle {
+              required property int index
+              readonly property real p: (batteryVisual.tetherPhase + index * 0.5) % 1.0
+              x: grapplerWidget.width - 2.0 + p * 6.5
+              anchors.verticalCenter: parent.verticalCenter
+              anchors.verticalCenterOffset: (index === 0) ? -0.5 : 0.5
+              width: 3.5 + p * 2.0
+              height: 1.1
+              radius: 0.5
+              color: Qt.lighter(Color.accent, 1.7)
+              opacity: (1.0 - p) * 0.9
+              antialiasing: true
+            }
+          }
+
+          // Grappler Assembly Row (Left Winch Spool -> Middle Guide Chassis -> Right Scorpion Pincers)
+          Item {
+            anchors.fill: parent
+
+            // 1. REAR ROTARY WINCH SPOOL (Circular Wire Drum)
+            Item {
+              id: winchSpool
+              anchors.left: parent.left
+              anchors.verticalCenter: parent.verticalCenter
+              width: batteryVisual.grapplerHeight - 1.0
+              height: batteryVisual.grapplerHeight - 1.0
+
+              // Titanium Outer Spool Rim
+              Rectangle {
+                anchors.fill: parent
+                radius: width / 2
+                color: Qt.rgba(0.05, 0.08, 0.12, 0.95)
+                border.width: 1.1
+                border.color: {
+                  if (button.active && button.useActiveColor) return button.activeColor
+                  if (root.charging) return Qt.rgba(batteryVisual.glowColor.r, batteryVisual.glowColor.g, batteryVisual.glowColor.b, 0.9)
+                  if (root.discharging && root.batteryFraction <= 0.2) return Color.urgent
+                  return Qt.rgba(button.foreground.r, button.foreground.g, button.foreground.b, 0.45)
+                }
+                antialiasing: true
+
+                Behavior on border.color { ColorAnimation { duration: 160 } }
+
+                // Inner Coiled High-Tensile Carbon Cable Fill (Scales with Battery %)
+                Rectangle {
+                  anchors.centerIn: parent
+                  width: Math.max(3.0, (parent.width - 3.2) * (0.3 + root.batteryFraction * 0.7))
+                  height: width
+                  radius: width / 2
+                  color: {
+                    if (root.discharging && root.batteryFraction <= 0.2) return Color.urgent
+                    if (root.charging) return Qt.lighter(batteryVisual.bavariumColor, 1.25)
+                    return batteryVisual.bavariumColor
+                  }
+                  opacity: {
+                    if (root.discharging && root.batteryFraction <= 0.2) return batteryVisual.warningStrobe * 0.95
+                    if (root.charging) return 0.8 + batteryVisual.chargePulse * 0.2
+                    return 0.45 + root.batteryFraction * 0.5
+                  }
+                  antialiasing: true
+
+                  Behavior on width { NumberAnimation { duration: 280 } }
+                  Behavior on color { ColorAnimation { duration: 160 } }
+                  Behavior on opacity { NumberAnimation { duration: 200 } }
+                }
+
+                // Rotary Spool Spokes (SPINS WHEN CHARGING, COMPLETELY LOCKED/STATIONARY WHEN NOT CHARGING)
+                Item {
+                  anchors.fill: parent
+                  rotation: root.charging ? batteryVisual.winchSpinAngle : 0.0
+
+                  Repeater {
+                    model: 2
+                    Rectangle {
+                      required property int index
+                      anchors.centerIn: parent
+                      width: parent.width - 2.8
+                      height: 1.0
+                      rotation: index * 90
+                      color: root.charging ? Qt.lighter(Color.accent, 1.6) : Qt.rgba(button.foreground.r, button.foreground.g, button.foreground.b, 0.7)
+                      antialiasing: true
+                    }
+                  }
+                }
+
+                // Center Bavarium Diode Pin
+                Rectangle {
+                  anchors.centerIn: parent
+                  width: 2.2
+                  height: 2.2
+                  radius: 1.1
+                  color: root.charging ? Qt.lighter(Color.accent, 1.7) : Qt.lighter(batteryVisual.glowColor, 1.3)
+                  antialiasing: true
+                }
+              }
+            }
+
+            // 2. MIDDLE GAUNTLET GUIDE CHASSIS & CONDUIT
+            Item {
+              anchors.left: winchSpool.right
+              anchors.leftMargin: -1.0
+              anchors.verticalCenter: parent.verticalCenter
+              width: 5.5
+              height: 5.5
+
+              // Reinforced Guide Rail Block
+              Rectangle {
+                anchors.centerIn: parent
+                width: parent.width
+                height: 3.8
+                radius: 0.8
+                color: Qt.rgba(0.12, 0.16, 0.20, 0.95)
+                border.width: 0.9
+                border.color: root.charging ? Qt.lighter(batteryVisual.glowColor, 1.1) : Qt.rgba(button.foreground.r, button.foreground.g, button.foreground.b, 0.4)
+                antialiasing: true
+              }
+
+              // Glowing Bavarium Conduit Line
+              Rectangle {
+                anchors.centerIn: parent
+                width: parent.width
+                height: 1.1
+                color: root.charging ? Qt.lighter(Color.accent, 1.5) : (root.discharging && root.batteryFraction <= 0.2 ? Color.urgent : batteryVisual.bavariumColor)
+                opacity: root.charging ? 0.95 : 0.75
+                antialiasing: true
+              }
+            }
+
+            // 3. FRONT PROTEC GRAPPLER G3 SCORPION PINCER ANCHOR HEAD
+            Item {
+              id: anchorHead
+              anchors.left: winchSpool.right
+              anchors.leftMargin: 3.5
+              anchors.right: parent.right
+              anchors.top: parent.top
+              anchors.bottom: parent.bottom
+
+              Canvas {
+                id: anchorCanvas
+                anchors.fill: parent
+                antialiasing: true
+
+                property real flex: batteryVisual.clawFlex
+                property bool chg: root.charging
+                property color cGlow: batteryVisual.glowColor
+                property color cBavarium: batteryVisual.bavariumColor
+                property real frac: root.batteryFraction
+                property real wStrobe: batteryVisual.warningStrobe
+
+                onFlexChanged: requestPaint()
+                onChgChanged: requestPaint()
+                onCGlowChanged: requestPaint()
+                onCBavariumChanged: requestPaint()
+                onFracChanged: requestPaint()
+                onWStrobeChanged: requestPaint()
+
+                onPaint: {
+                  var ctx = getContext("2d")
+                  ctx.reset()
+
+                  var w = width
+                  var h = height
+                  var cy = h / 2
+
+                  var isLow = (root.discharging && frac <= 0.2)
+                  var hookColor = isLow ? "#ff4444" : (chg ? Qt.lighter(cBavarium, 1.3) : cBavarium)
+                  var metalColor = isLow ? "#ff4444" : (chg ? Qt.lighter(cGlow, 1.15) : Qt.rgba(button.foreground.r, button.foreground.g, button.foreground.b, 0.65))
+
+                  // Dynamic claw opening angle/flex (PULSES ONLY WHEN CHARGING)
+                  var flexOffset = chg ? (flex * 1.2) : 0.0
+
+                  ctx.save()
+
+                  // --- TOP SCORPION PINCER HOOK ---
+                  ctx.beginPath()
+                  ctx.moveTo(1.0, cy - 1.5)
+                  ctx.lineTo(3.5, cy - 2.5)
+                  // Curve up and out to claw tip
+                  ctx.bezierCurveTo(5.5, cy - 4.5 - flexOffset, 7.5, cy - 6.0 - flexOffset, w - 2.2, cy - 5.5 - flexOffset)
+                  // Inward sharp barb tip
+                  ctx.lineTo(w - 0.5, cy - 4.2 - flexOffset)
+                  ctx.lineTo(w - 3.2, cy - 2.5 - flexOffset)
+                  // Inner curve back to base
+                  ctx.bezierCurveTo(6.0, cy - 3.2 - flexOffset, 4.0, cy - 1.8, 1.0, cy - 0.8)
+                  ctx.closePath()
+
+                  ctx.fillStyle = Qt.rgba(hookColor.r, hookColor.g, hookColor.b, chg ? 0.9 : 0.75)
+                  ctx.fill()
+                  ctx.lineWidth = 1.0
+                  ctx.strokeStyle = metalColor
+                  ctx.stroke()
+
+                  // --- BOTTOM SCORPION PINCER HOOK ---
+                  ctx.beginPath()
+                  ctx.moveTo(1.0, cy + 1.5)
+                  ctx.lineTo(3.5, cy + 2.5)
+                  // Curve down and out to claw tip
+                  ctx.bezierCurveTo(5.5, cy + 4.5 + flexOffset, 7.5, cy + 6.0 + flexOffset, w - 2.2, cy + 5.5 + flexOffset)
+                  // Inward sharp barb tip
+                  ctx.lineTo(w - 0.5, cy + 4.2 + flexOffset)
+                  ctx.lineTo(w - 3.2, cy + 2.5 + flexOffset)
+                  // Inner curve back to base
+                  ctx.bezierCurveTo(6.0, cy + 3.2 + flexOffset, 4.0, cy + 1.8, 1.0, cy + 0.8)
+                  ctx.closePath()
+
+                  ctx.fillStyle = Qt.rgba(hookColor.r, hookColor.g, hookColor.b, chg ? 0.9 : 0.75)
+                  ctx.fill()
+                  ctx.lineWidth = 1.0
+                  ctx.strokeStyle = metalColor
+                  ctx.stroke()
+
+                  // --- CENTER PIERCING HARPOON DART ---
+                  ctx.beginPath()
+                  ctx.moveTo(1.0, cy - 1.2)
+                  ctx.lineTo(w - 3.5, cy - 1.2)
+                  ctx.lineTo(w - 0.5, cy)
+                  ctx.lineTo(w - 3.5, cy + 1.2)
+                  ctx.lineTo(1.0, cy + 1.2)
+                  ctx.closePath()
+
+                  ctx.fillStyle = isLow ? Qt.rgba(1.0, 0.2, 0.2, wStrobe) : (chg ? Qt.lighter(Color.accent, 1.6) : Qt.lighter(hookColor, 1.2))
+                  ctx.fill()
+                  ctx.lineWidth = 0.9
+                  ctx.strokeStyle = Qt.rgba(1.0, 1.0, 1.0, 0.6)
+                  ctx.stroke()
+
+                  ctx.restore()
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  KeyboardPanel {
+    id: panel
+    anchorItem: button
+    owner: root
+    bar: root.bar
+    open: root.opened && root.batteryPresent
+    focusTarget: keyCatcher
+    contentWidth: panel.fittedContentWidth(Style.space(380))
+    contentHeight: panel.fittedContentHeight(column.implicitHeight)
+
+    PanelKeyCatcher {
+      id: keyCatcher
+      anchors.fill: parent
+      onMoveRequested: function(dx, dy) {
+        if (!root.cursorActive) { root.cursorActive = true; return }
+        if (dx !== 0) root.selectProfileByDelta(dx)
+        else if (dy !== 0) root.selectProfileByDelta(dy)
+      }
+      onActivateRequested: if (root.cursorActive) root.activateSelectedProfile()
+      onCloseRequested: root.close()
+      onTabRequested: function(direction) { root.switchPanel(direction) }
+
+      Column {
+        id: column
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        spacing: Style.space(14)
+
+        // ---------- Hero: battery icon · title/status · percentage ----------
+        Item {
+          width: parent.width
+          implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight, heroPercent.implicitHeight)
+
+          Text {
+            id: heroIcon
+            textFormat: Text.PlainText
+            text: root.batteryIcon()
+            color: root.bar.foreground
+            font.family: root.bar.fontFamily
+            font.pixelSize: Style.font.display
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+
+            Behavior on color { ColorAnimation { duration: 200 } }
+          }
+
+          Column {
+            id: heroLabels
+            anchors.left: heroIcon.right
+            anchors.leftMargin: Style.space(14)
+            anchors.right: heroPercent.left
+            anchors.rightMargin: Style.space(10)
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Style.space(2)
+
+            Text {
+              text: "Battery"
+              color: root.bar.foreground
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.title
+              font.bold: true
+              elide: Text.ElideRight
+              width: parent.width
+            }
+
+            Text {
+              id: heroStatus
+              textFormat: Text.PlainText
+              text: root.heroStatusText.toUpperCase()
+              color: Qt.darker(root.bar.foreground, 1.4)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
+              font.bold: true
+              font.letterSpacing: 1.2
+              elide: Text.ElideRight
+              width: parent.width
+            }
+          }
+
+          Text {
+            id: heroPercent
+            textFormat: Text.PlainText
+            text: root.batteryInfo.percentage || "—"
+            color: root.bar.foreground
+            font.family: root.bar.fontFamily
+            font.pixelSize: Style.font.displayLarge
+            font.bold: true
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+
+            Behavior on color { ColorAnimation { duration: 200 } }
+          }
+        }
+
+        // ---------- Battery progress bar ----------
+        Item {
+          width: parent.width
+          implicitHeight: Style.space(8)
+
+          Rectangle {
+            id: barTrack
+            anchors.fill: parent
+            radius: height / 2
+            color: Qt.rgba(root.bar.foreground.r, root.bar.foreground.g, root.bar.foreground.b, 0.12)
+          }
+
+          Rectangle {
+            id: barFill
+            anchors.left: barTrack.left
+            anchors.verticalCenter: barTrack.verticalCenter
+            height: barTrack.height
+            radius: barTrack.radius
+            color: root.batteryFillColor
+            width: Math.max(barTrack.height, barTrack.width * root.batteryFraction)
+
+            Behavior on width { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+            Behavior on color { ColorAnimation { duration: 220 } }
+
+            // Subtle pulse while charging — visible signal that energy is flowing in.
+            SequentialAnimation on opacity {
+              running: root.charging && !root.fullyCharged && root.opened
+              loops: Animation.Infinite
+              alwaysRunToEnd: true
+              NumberAnimation { from: 1.0; to: 0.55; duration: 950; easing.type: Easing.InOutSine }
+              NumberAnimation { from: 0.55; to: 1.0; duration: 950; easing.type: Easing.InOutSine }
+            }
+          }
+        }
+
+        // ---------- Stats ----------
+        // Visibility is intentionally only gated by "we've ever loaded data" so
+        // the section never collapses mid-transition. fullyCharged is *not* part
+        // of the condition: UPower briefly reports FullyCharged on plug-in when
+        // the battery sits above the charge-control start threshold, and we
+        // refuse to flicker the whole panel for that ~1s window.
+        Row {
+          visible: root.batteryInfo.percentage !== undefined
+          width: parent.width
+          spacing: Style.space(20)
+
+          Column {
+            width: (parent.width - parent.spacing) / 2
+            spacing: Style.spacing.labelGap
+            InfoPair { label: "Battery size"; value: root.batteryInfo.size || "" }
+            InfoPair { label: "Charge cycles"; value: root.batteryInfo.cycles || "—" }
+          }
+
+          Column {
+            width: (parent.width - parent.spacing) / 2
+            spacing: Style.spacing.labelGap
+            InfoPair {
+              label: root.chargeThresholdActive ? "Charge limit" : (root.discharging ? "Time left" : "Time to full")
+              value: root.chargeThresholdActive ? (root.batteryInfo.threshold || "-") : (root.batteryFlowIdle ? "-" : (root.batteryInfo.time || "—"))
+            }
+            InfoPair {
+              label: root.chargeThresholdActive ? "Battery state" : (root.discharging ? "Discharging" : "Charging")
+              value: root.chargeThresholdActive ? "Holding" : (root.batteryFull ? "-" : (root.batteryInfo.rate || ""))
+            }
+          }
+        }
+
+        // ---------- Power profile picker ----------
+        PanelSeparator {
+          foreground: root.bar.foreground
+        }
+
+        Column {
+          width: parent.width
+          spacing: Style.space(10)
+
+          PanelSectionHeader {
+            text: "POWER PROFILE"
+            foreground: root.bar.foreground
+            fontFamily: root.bar.fontFamily
+          }
+
+          Row {
+            id: profileRow
+            width: parent.width
+            spacing: Style.space(6)
+
+            readonly property real cellWidth: root.profiles.length > 0
+              ? (width - spacing * (root.profiles.length - 1)) / root.profiles.length
+              : 0
+
+            Repeater {
+              model: root.profiles
+              Button {
+                required property var modelData
+                required property int index
+                width: profileRow.cellWidth
+                iconText: root.profileIcon(String(modelData))
+                iconSize: Style.font.title
+                text: String(modelData).charAt(0).toUpperCase() + String(modelData).slice(1)
+                fontSize: Style.font.bodySmall
+                foreground: root.bar.foreground
+                fontFamily: root.bar.fontFamily
+                horizontalPadding: Style.spacing.controlPaddingX
+                verticalPadding: Style.spacing.controlPaddingY + Style.space(2)
+                bordered: true
+                active: root.activeProfile === modelData
+                hasCursor: root.cursorActive && root.profileIndex === index
+                onClicked: root.setProfile(modelData)
+                onHovered: function(h) {
+                  if (h) {
+                    root.cursorActive = true
+                    root.profileIndex = index
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  component InfoPair: Row {
+    property string label: ""
+    property string value: ""
+
+    width: parent.width
+    spacing: Style.space(8)
+
+    InfoLabel { text: label }
+    Item { width: Math.max(0, parent.width - parent.children[0].implicitWidth - parent.children[2].implicitWidth - parent.spacing * 2); height: 1 }
+    InfoValue { text: value }
+  }
+
+  component InfoLabel: Text {
+    textFormat: Text.PlainText
+    color: root.bar.foreground
+    opacity: 0.6
+    font.family: root.bar.fontFamily
+    font.pixelSize: Style.font.bodySmall
+  }
+
+  component InfoValue: Text {
+    textFormat: Text.PlainText
+    color: root.bar.foreground
+    font.family: root.bar.fontFamily
+    font.pixelSize: Style.font.bodySmall
+  }
+}

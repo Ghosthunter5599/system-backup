@@ -1,0 +1,118 @@
+{
+  "bar": {
+    "centerAnchor": "omarchy.clock",
+    "layout": {
+      "center": [
+        {
+          "id": "local.power-mode"
+        },
+        {
+          "id": "shavanced.notification-center"
+        },
+        {
+          "format": "dddd h:mm AP",
+          "formatAlt": "d MMMM 'W'ww yyyy",
+          "id": "omarchy.clock",
+          "verticalFormat": "HH\n—\nmm"
+        },
+        {
+          "id": "omarchy.keyboard-layout"
+        },
+        {
+          "id": "omarchy.weather"
+        },
+        {
+          "id": "omarchy.indicators"
+        },
+        {
+          "id": "omarchy.microphone"
+        },
+        {
+          "id": "omarchy.system-update"
+        }
+      ],
+      "left": [
+        {
+          "id": "omarchy.menu"
+        },
+        {
+          "id": "io.github.thetrueferret.decent-workspaces"
+        },
+        {
+          "id": "nosignal.plugin-manager"
+        },
+        {
+          "id": "io.github.tuthan.dropdown-terminal"
+        },
+        {
+          "audioQuality": "320 kbps",
+          "deviceName": "Omarchy Spotify",
+          "id": "quickshell.spotify",
+          "idleShutdownMinutes": 15,
+          "scrollBarText": "Off",
+          "scrollSpeed": "1",
+          "searchHistory": "[\"run it up\",\"run it\",\"vaada vaada\",\"vaada\",\"raatu\",\"veerappa\",\"tuka doka\",\"tuka\",\"to\",\"sh\",\"vaada vaad\",\"perfect\"]",
+          "sessionState": "{\"tab\":\"setup\",\"searchText\":\"\",\"searchType\":\"track\",\"libraryType\":\"tracks\",\"homeType\":\"recent\",\"libraryFilter\":\"\",\"librarySort\":\"default\",\"playlistFilter\":\"\",\"playlistSort\":\"default\",\"detailFilter\":\"\",\"detailSort\":\"default\",\"homeFilter\":\"\",\"discoverFilter\":\"\",\"queueFilter\":\"\",\"artistSearchText\":\"\",\"scrollPositions\":{\"home:recent\":0,\"discover\":248,\"home:tracks\":0,\"search:track\":0,\"playlist:\":0,\"playlist:2Qc8Kp4uEPKXq2dZ6Ha80G\":0,\"library:tracks\":966},\"detailItem\":null,\"selectedPlaylistId\":\"2Qc8Kp4uEPKXq2dZ6Ha80G\",\"lastRadioPlaylist\":null}",
+          "shortcutPlayer": "Full player",
+          "showArtistName": "Off",
+          "showMiniPlayer": "On",
+          "showTrackTitle": "Off"
+        }
+      ],
+      "right": [
+        {
+          "id": "omarchy.agents"
+        },
+        {
+          "id": "better.displays"
+        },
+        {
+          "id": "omarchy.bluetooth"
+        },
+        {
+          "id": "omarchy.network"
+        },
+        {
+          "id": "local.sysmon"
+        },
+        {
+          "hidden": [],
+          "id": "omarchy.tray",
+          "pinned": []
+        },
+        {
+          "id": "ssupt.audio-control"
+        },
+        {
+          "id": "omarchy.power"
+        }
+      ]
+    },
+    "position": "top",
+    "transparent": true
+  },
+  "cloneSourceRestores": [
+    "ssupt.audio-control",
+    "shmall.lock"
+  ],
+  "disabledPlugins": [
+    "omarchy.audio",
+    "omarchy.lock"
+  ],
+  "idle": {
+    "lock": 300,
+    "screensaver": 150
+  },
+  "plugins": [
+    {
+      "id": "local.power-mode"
+    },
+    {
+      "id": "nosignal.plugin-manager"
+    },
+    {
+      "id": "shmall.lock"
+    }
+  ],
+  "version": 1
+}

@@ -1,0 +1,112 @@
+{
+  "bar": {
+    "centerAnchor": "omarchy.clock",
+    "layout": {
+      "center": [
+        {
+          "id": "shavanced.notification-center"
+        },
+        {
+          "id": "b47m4n.agent-nexus"
+        },
+        {
+          "id": "local.power-mode"
+        },
+        {
+          "id": "omarchy.clock",
+          "format": "dddd h:mm AP",
+          "formatAlt": "d MMMM 'W'ww yyyy",
+          "verticalFormat": "HH\n—\nmm"
+        },
+        {
+          "id": "omarchy.keyboard-layout"
+        },
+        {
+          "id": "omarchy.weather"
+        },
+        {
+          "id": "omarchy.system-update"
+        },
+        {
+          "id": "b47m4n.indicators"
+        },
+        {
+          "id": "omarchy.microphone"
+        }
+      ],
+      "left": [
+        {
+          "id": "b47m4n.menu"
+        },
+        {
+          "id": "io.github.thetrueferret.decent-workspaces"
+        },
+        {
+          "id": "io.github.tuthan.dropdown-terminal"
+        },
+        {
+          "id": "nosignal.plugin-manager"
+        }
+      ],
+      "right": [
+        {
+          "id": "omarchy.tray"
+        },
+        {
+          "id": "io.github.shivamnarkar47.omarchy-hotspot"
+        },
+        {
+          "id": "local.warp"
+        },
+        {
+          "id": "b47m4n.agents"
+        },
+        {
+          "id": "local.sysmon"
+        },
+        {
+          "id": "omarchy.bluetooth"
+        },
+        {
+          "id": "omarchy.network"
+        },
+        {
+          "id": "better.displays"
+        },
+        {
+          "id": "ssupt.audio-control"
+        },
+        {
+          "id": "omarchy.power"
+        }
+      ]
+    },
+    "position": "top",
+    "transparent": true,
+    "id": "b47m4n.bar",
+    "glow": false
+  },
+  "idle": {
+    "lock": 300,
+    "screensaver": 150
+  },
+  "plugins": [
+    {
+      "id": "nosignal.plugin-manager"
+    },
+    {
+      "id": "shmall.lock"
+    }
+  ],
+  "version": 1,
+  "disabledPlugins": [
+    "omarchy.audio",
+    "omarchy.lock",
+    "omarchy.menu"
+  ],
+  "cloneSourceRestores": [
+    "ssupt.audio-control",
+    "shmall.lock",
+    "b47m4n.menu"
+  ]
+}

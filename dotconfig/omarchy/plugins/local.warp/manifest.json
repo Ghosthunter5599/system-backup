@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "local.warp",
+  "name": "Cloudflare WARP",
+  "version": "1.1.0",
+  "author": "Tobias Lütke",
+  "license": "MIT",
+  "description": "Cloudflare WARP status, connect/disconnect, operating mode switching, and tunnel stats in the Omarchy bar.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Cloudflare WARP",
+    "description": "Toggle WARP, switch operating mode, register the device, and inspect tunnel stats.",
+    "category": "Network",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "refreshIntervalSec": 20
+    },
+    "schema": [
+      {
+        "key": "refreshIntervalSec",
+        "type": "integer",
+        "label": "Refresh interval (seconds)",
+        "min": 5,
+        "max": 3600,
+        "step": 5,
+        "defaultValue": 20
+      }
+    ]
+  }
+}

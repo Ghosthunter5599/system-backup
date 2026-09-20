@@ -1,0 +1,45 @@
+add_newline = true
+command_timeout = 200
+format = "[$directory$git_branch$git_status]($style)$python$cmd_duration$character"
+
+[character]
+error_symbol = "[✗](bold red) "
+success_symbol = "[❯](bold cyan) "
+
+[directory]
+truncation_length = 0
+truncate_to_repo = false
+style = "bold cyan"
+read_only = " 󰌾"
+read_only_style = "bold red"
+format = "[$path]($style)[$read_only]($read_only_style) "
+
+[git_branch]
+format = "[$branch]($style) "
+style = "italic cyan"
+
+[git_status]
+format     = '[$all_status]($style)'
+style      = "cyan"
+ahead      = "⇡${count} "
+diverged   = "⇕⇡${ahead_count}⇣${behind_count} "
+behind     = "⇣${count} "
+conflicted = " "
+up_to_date = " "
+untracked  = "? "
+modified   = " "
+stashed    = ""
+staged     = ""
+renamed    = ""
+deleted    = ""
+
+[cmd_duration]
+min_time = 2000
+format = "took [$duration](bold yellow) "
+
+[python]
+symbol = " "
+detect_extensions = []
+detect_files = []
+detect_folders = []
+format = 'via [${symbol}(\($virtualenv\))]($style) '

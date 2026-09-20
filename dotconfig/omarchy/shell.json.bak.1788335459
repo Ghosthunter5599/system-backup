@@ -1,0 +1,121 @@
+{
+  "bar": {
+    "centerAnchor": "omarchy.clock",
+    "layout": {
+      "center": [
+        {
+          "id": "quickshell.spotify",
+          "deviceName": "Omarchy Spotify",
+          "idleShutdownMinutes": 15,
+          "showMiniPlayer": "On",
+          "shortcutPlayer": "Omarchy default",
+          "showTrackTitle": "On",
+          "showArtistName": "Off",
+          "scrollBarText": "Off",
+          "scrollSpeed": "1",
+          "audioQuality": "320 kbps",
+          "searchHistory": "[\"yenna soll\",\"yenna s\",\"yenna\",\"ye\",\"kanave\",\"kana\",\"yenna solla\"]",
+          "sessionState": "{\"tab\":\"setup\",\"searchText\":\"\",\"searchType\":\"track\",\"libraryType\":\"tracks\",\"homeType\":\"recent\",\"libraryFilter\":\"\",\"librarySort\":\"default\",\"playlistFilter\":\"\",\"playlistSort\":\"default\",\"detailFilter\":\"\",\"detailSort\":\"default\",\"homeFilter\":\"\",\"discoverFilter\":\"\",\"queueFilter\":\"\",\"artistSearchText\":\"\",\"scrollPositions\":{\"home:recent\":0,\"playlist:5bQuUihvWJ1Q5Zsac8bMyv\":3605,\"discover\":0,\"search:track\":0},\"detailItem\":null,\"selectedPlaylistId\":\"5bQuUihvWJ1Q5Zsac8bMyv\",\"lastRadioPlaylist\":null}"
+        },
+        {
+          "id": "b47m4n.indicators"
+        },
+        {
+          "id": "local.power-mode"
+        },
+        {
+          "id": "omarchy.clock",
+          "format": "dddd h:mm AP",
+          "formatAlt": "d MMMM 'W'ww yyyy",
+          "verticalFormat": "HH\n—\nmm"
+        },
+        {
+          "id": "omarchy.keyboard-layout"
+        },
+        {
+          "id": "omarchy.weather"
+        },
+        {
+          "id": "shavanced.notification-center"
+        },
+        {
+          "id": "omarchy.system-update"
+        },
+        {
+          "id": "omarchy.microphone"
+        }
+      ],
+      "left": [
+        {
+          "id": "b47m4n.menu"
+        },
+        {
+          "id": "io.github.thetrueferret.decent-workspaces"
+        },
+        {
+          "id": "io.github.tuthan.dropdown-terminal"
+        },
+        {
+          "id": "nosignal.plugin-manager"
+        }
+      ],
+      "right": [
+        {
+          "id": "omarchy.tray"
+        },
+        {
+          "id": "io.github.rawritude.simple-hotspot"
+        },
+        {
+          "id": "local.warp"
+        },
+        {
+          "id": "b47m4n.agents"
+        },
+        {
+          "id": "local.sysmon"
+        },
+        {
+          "id": "omarchy.bluetooth"
+        },
+        {
+          "id": "omarchy.network"
+        },
+        {
+          "id": "better.displays"
+        },
+        {
+          "id": "ssupt.audio-control"
+        },
+        {
+          "id": "omarchy.power"
+        }
+      ]
+    },
+    "position": "top",
+    "transparent": true
+  },
+  "idle": {
+    "lock": 300,
+    "screensaver": 150
+  },
+  "plugins": [
+    {
+      "id": "nosignal.plugin-manager"
+    },
+    {
+      "id": "shmall.lock"
+    }
+  ],
+  "version": 1,
+  "disabledPlugins": [
+    "omarchy.audio",
+    "omarchy.lock",
+    "omarchy.menu"
+  ],
+  "cloneSourceRestores": [
+    "ssupt.audio-control",
+    "shmall.lock",
+    "b47m4n.menu"
+  ]
+}

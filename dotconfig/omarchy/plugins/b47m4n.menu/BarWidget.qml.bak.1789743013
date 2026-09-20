@@ -1,0 +1,266 @@
+import QtQuick
+import QtQuick.Effects
+import qs.Commons
+import qs.Ui
+
+BarWidget {
+  id: root
+  moduleName: "b47m4n.menu"
+
+  readonly property real iconHeight: Math.max(10, Math.round(Style.font.body * 1.05))
+  readonly property real iconWidth: Math.round(iconHeight * (175.75 / 59.6211))
+
+  implicitWidth: button.implicitWidth
+  implicitHeight: button.implicitHeight
+
+  WidgetButton {
+    id: button
+    anchors.fill: parent
+    bar: root.bar
+    labelVisible: false
+    hasVisualContent: true
+    horizontalMargin: 8
+    fixedWidth: vertical ? -1 : Math.round(root.iconWidth + scaledHorizontalMargin * 2)
+    fixedHeight: vertical ? Math.round(root.iconHeight + scaledVerticalPadding * 2) : -1
+
+    Item {
+      id: iconContainer
+      anchors.centerIn: parent
+      width: root.iconWidth
+      height: root.iconHeight
+
+      Image {
+        id: logoImage
+        anchors.fill: parent
+        source: Qt.resolvedUrl("assets/batman-seeklogo.svg")
+        fillMode: Image.PreserveAspectFit
+        sourceSize.width: Math.round(root.iconWidth * Screen.devicePixelRatio * 2)
+        sourceSize.height: Math.round(root.iconHeight * Screen.devicePixelRatio * 2)
+        smooth: true
+        mipmap: true
+        visible: false
+      }
+
+      property real pulseFactor: 0.35
+      readonly property bool isScanning: button.tooltipHovered || button.active
+      property real sonarPhase: 0.0
+
+      SequentialAnimation on pulseFactor {
+        id: pulseAnim
+        running: true
+        loops: Animation.Infinite
+
+        NumberAnimation {
+          from: 0.25
+          to: 1.0
+          duration: 1600
+          easing.type: Easing.InOutSine
+        }
+        NumberAnimation {
+          from: 1.0
+          to: 0.25
+          duration: 1600
+          easing.type: Easing.InOutSine
+        }
+      }
+
+      NumberAnimation on sonarPhase {
+        id: sonarAnim
+        running: true
+        loops: Animation.Infinite
+        from: 0.0
+        to: 1.0
+        duration: iconContainer.isScanning ? 1100 : 3600
+      }
+
+      onIsScanningChanged: {
+        sonarAnim.stop()
+        sonarPhase = 0.0
+        sonarAnim.start()
+      }
+
+      readonly property color glowColor: button.active && button.useActiveColor ? button.activeColor : Qt.lighter(Color.accent, 1.15)
+
+      // Detective Vision Sonar Radar Waves
+      Item {
+        id: sonarContainer
+        anchors.centerIn: parent
+        width: root.iconWidth
+        height: root.iconHeight
+
+        // Sonar Ring 1 (Primary Pulse)
+        Rectangle {
+          id: sonarRing1
+          anchors.centerIn: parent
+          readonly property real p: iconContainer.sonarPhase
+          readonly property real activeFrac: p < 0.65 ? (p / 0.65) : 1.0
+          visible: p < 0.65
+          width: Math.round(root.iconWidth * (0.85 + activeFrac * 1.35))
+          height: Math.round(root.iconHeight * (0.85 + activeFrac * 1.45))
+          radius: width / 2
+          color: Util.alpha(iconContainer.glowColor, (1.0 - activeFrac) * (iconContainer.isScanning ? 0.12 : 0.04))
+          border.color: iconContainer.glowColor
+          border.width: 1.0
+          opacity: (1.0 - activeFrac) * (iconContainer.isScanning ? 0.85 : 0.55)
+          antialiasing: true
+        }
+
+        // Sonar Ring 2 (Secondary Staggered Pulse)
+        Rectangle {
+          id: sonarRing2
+          anchors.centerIn: parent
+          readonly property real p: (iconContainer.sonarPhase + 0.82) % 1.0
+          readonly property real activeFrac: p < 0.65 ? (p / 0.65) : 1.0
+          visible: p < 0.65
+          width: Math.round(root.iconWidth * (0.85 + activeFrac * 1.35))
+          height: Math.round(root.iconHeight * (0.85 + activeFrac * 1.45))
+          radius: width / 2
+          color: Util.alpha(iconContainer.glowColor, (1.0 - activeFrac) * (iconContainer.isScanning ? 0.08 : 0.03))
+          border.color: iconContainer.glowColor
+          border.width: 1.0
+          opacity: (1.0 - activeFrac) * (iconContainer.isScanning ? 0.75 : 0.45)
+          antialiasing: true
+        }
+      }
+
+      // Container for all glow passes - controls breathing pulse & hover stay-lit
+      Item {
+        id: glowContainer
+        anchors.fill: parent
+        opacity: (button.tooltipHovered || button.active) ? 1.0 : iconContainer.pulseFactor
+
+        Behavior on opacity {
+          enabled: button.tooltipHovered || button.active
+          NumberAnimation { duration: 250; easing.type: Easing.OutCubic }
+        }
+
+        // Outer neon bloom (Tightened radius)
+        Item {
+          anchors.centerIn: parent
+          width: Math.round(root.iconWidth * 1.30)
+          height: Math.round(root.iconHeight * 1.30)
+
+          Image {
+            id: glowImgOuter
+            anchors.fill: parent
+            source: logoImage.source
+            fillMode: Image.PreserveAspectFit
+            sourceSize.width: Math.round(parent.width * Screen.devicePixelRatio * 2)
+            sourceSize.height: Math.round(parent.height * Screen.devicePixelRatio * 2)
+            smooth: true
+            mipmap: true
+            visible: false
+          }
+
+          MultiEffect {
+            anchors.fill: parent
+            source: glowImgOuter
+            colorization: 1.0
+            colorizationColor: iconContainer.glowColor
+            blurEnabled: true
+            blur: 0.8
+            blurMax: 20
+            blurMultiplier: 1.2
+            opacity: 0.65
+
+            Behavior on colorizationColor {
+              enabled: !button.bar || button.bar.foregroundAnimationEnabled
+              ColorAnimation { duration: 160 }
+            }
+          }
+        }
+
+        // Mid radiant neon glow (Tightened radius)
+        Item {
+          anchors.centerIn: parent
+          width: Math.round(root.iconWidth * 1.18)
+          height: Math.round(root.iconHeight * 1.18)
+
+          Image {
+            id: glowImgMid
+            anchors.fill: parent
+            source: logoImage.source
+            fillMode: Image.PreserveAspectFit
+            sourceSize.width: Math.round(parent.width * Screen.devicePixelRatio * 2)
+            sourceSize.height: Math.round(parent.height * Screen.devicePixelRatio * 2)
+            smooth: true
+            mipmap: true
+            visible: false
+          }
+
+          MultiEffect {
+            anchors.fill: parent
+            source: glowImgMid
+            colorization: 1.0
+            colorizationColor: iconContainer.glowColor
+            blurEnabled: true
+            blur: 0.5
+            blurMax: 16
+            blurMultiplier: 0.9
+            opacity: 0.8
+
+            Behavior on colorizationColor {
+              enabled: !button.bar || button.bar.foregroundAnimationEnabled
+              ColorAnimation { duration: 160 }
+            }
+          }
+        }
+
+        // Tight edge halo (Contoured)
+        Item {
+          anchors.centerIn: parent
+          width: Math.round(root.iconWidth * 1.08)
+          height: Math.round(root.iconHeight * 1.08)
+
+          Image {
+            id: glowImgInner
+            anchors.fill: parent
+            source: logoImage.source
+            fillMode: Image.PreserveAspectFit
+            sourceSize.width: Math.round(parent.width * Screen.devicePixelRatio * 2)
+            sourceSize.height: Math.round(parent.height * Screen.devicePixelRatio * 2)
+            smooth: true
+            mipmap: true
+            visible: false
+          }
+
+          MultiEffect {
+            anchors.fill: parent
+            source: glowImgInner
+            colorization: 1.0
+            colorizationColor: iconContainer.glowColor
+            blurEnabled: true
+            blur: 0.25
+            blurMax: 10
+            blurMultiplier: 0.6
+            opacity: 0.9
+
+            Behavior on colorizationColor {
+              enabled: !button.bar || button.bar.foregroundAnimationEnabled
+              ColorAnimation { duration: 160 }
+            }
+          }
+        }
+      }
+
+      // Crisp Foreground Core Logo
+      MultiEffect {
+        anchors.fill: logoImage
+        source: logoImage
+        colorization: 1.0
+        colorizationColor: button.active && button.useActiveColor ? button.activeColor : button.foreground
+
+        Behavior on colorizationColor {
+          enabled: !button.bar || button.bar.foregroundAnimationEnabled
+          ColorAnimation { duration: 160 }
+        }
+      }
+    }
+
+    onPressed: function(btn) {
+      if (!root.bar) return
+      if (btn === Qt.RightButton) root.bar.run("xdg-terminal-exec")
+      else root.bar.run("omarchy-shell shell toggle b47m4n.menu '{\"menu\":\"root\"}'")
+    }
+  }
+}

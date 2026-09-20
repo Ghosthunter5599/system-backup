@@ -1,0 +1,154 @@
+import QtQuick
+import QtQuick.Effects
+import qs.Commons
+import qs.Ui
+
+BarWidget {
+  id: root
+  moduleName: "b47m4n.menu"
+
+  readonly property real iconHeight: Math.max(10, Math.round(Style.font.body * 1.05))
+  readonly property real iconWidth: Math.round(iconHeight * (175.75 / 59.6211))
+
+  implicitWidth: button.implicitWidth
+  implicitHeight: button.implicitHeight
+
+  WidgetButton {
+    id: button
+    anchors.fill: parent
+    bar: root.bar
+    labelVisible: false
+    hasVisualContent: true
+    horizontalMargin: 8
+    fixedWidth: vertical ? -1 : Math.round(root.iconWidth + scaledHorizontalMargin * 2)
+    fixedHeight: vertical ? Math.round(root.iconHeight + scaledVerticalPadding * 2) : -1
+
+    Item {
+      id: iconContainer
+      anchors.centerIn: parent
+      width: root.iconWidth
+      height: root.iconHeight
+
+      Image {
+        id: logoImage
+        anchors.fill: parent
+        source: Qt.resolvedUrl("assets/batman-seeklogo.svg")
+        fillMode: Image.PreserveAspectFit
+        sourceSize.width: Math.round(root.iconWidth * Screen.devicePixelRatio * 2)
+        sourceSize.height: Math.round(root.iconHeight * Screen.devicePixelRatio * 2)
+        smooth: true
+        mipmap: true
+        visible: false
+      }
+
+      // Bat-Signal Sweep Controller
+      property real sweepAngle: 0.0
+      readonly property bool isTargetLocked: button.tooltipHovered || button.active
+
+      SequentialAnimation on sweepAngle {
+        id: sweepAnim
+        running: !iconContainer.isTargetLocked
+        loops: Animation.Infinite
+
+        NumberAnimation {
+          from: -26.0
+          to: 26.0
+          duration: 3200
+          easing.type: Easing.InOutSine
+        }
+        NumberAnimation {
+          from: 26.0
+          to: -26.0
+          duration: 3200
+          easing.type: Easing.InOutSine
+        }
+      }
+
+      readonly property color glowColor: button.active && button.useActiveColor ? button.activeColor : Qt.lighter(Color.accent, 1.15)
+
+      // Bat-Signal Atmospheric Searchlight Beam (Sweeping Gotham Sky Projector)
+      Item {
+        id: searchlightLayer
+        anchors.centerIn: parent
+        width: Math.round(root.iconWidth * 1.55)
+        height: Math.round(root.iconHeight * 1.75)
+        scale: iconContainer.isTargetLocked ? 1.25 : 1.0
+        opacity: iconContainer.isTargetLocked ? 1.0 : 0.75
+
+        Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutBack } }
+        Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
+
+        Item {
+          id: beamCone
+          anchors.centerIn: parent
+          width: parent.width * 1.4
+          height: parent.height * 1.4
+          rotation: iconContainer.isTargetLocked ? 0 : iconContainer.sweepAngle
+          visible: false
+
+          Behavior on rotation {
+            enabled: iconContainer.isTargetLocked
+            NumberAnimation { duration: 350; easing.type: Easing.OutCubic }
+          }
+
+          // Outer Searchlight Beam Spread
+          Rectangle {
+            anchors.centerIn: parent
+            width: parent.width
+            height: parent.height
+            radius: width / 2
+            gradient: Gradient {
+              orientation: Gradient.Vertical
+              GradientStop { position: 0.0; color: "transparent" }
+              GradientStop { position: 0.25; color: Util.alpha(iconContainer.glowColor, 0.18) }
+              GradientStop { position: 0.5; color: Util.alpha(iconContainer.glowColor, 0.55) }
+              GradientStop { position: 0.75; color: Util.alpha(iconContainer.glowColor, 0.18) }
+              GradientStop { position: 1.0; color: "transparent" }
+            }
+            antialiasing: true
+          }
+
+          // Focused Projector Core Spotlight
+          Rectangle {
+            anchors.centerIn: parent
+            width: Math.round(root.iconWidth * 0.95)
+            height: Math.round(root.iconHeight * 1.15)
+            radius: width / 2
+            color: Util.alpha(iconContainer.glowColor, 0.45)
+            antialiasing: true
+          }
+        }
+
+        // Soft Atmospheric Sky Cloud Diffusion
+        MultiEffect {
+          anchors.fill: beamCone
+          source: beamCone
+          blurEnabled: true
+          blur: 0.85
+          blurMax: 24
+          blurMultiplier: 1.4
+          opacity: 0.95
+        }
+      }
+
+      // Crisp Foreground Core Logo (Projected Bat Silhouette)
+      MultiEffect {
+        anchors.fill: logoImage
+        source: logoImage
+        colorization: 1.0
+        colorizationColor: button.active && button.useActiveColor ? button.activeColor : button.foreground
+
+        Behavior on colorizationColor {
+          enabled: !button.bar || button.bar.foregroundAnimationEnabled
+          ColorAnimation { duration: 160 }
+        }
+      }
+    }
+
+    onPressed: function(btn) {
+      if (!root.bar) return
+      if (btn === Qt.RightButton) root.bar.run("xdg-terminal-exec")
+      else root.bar.run("omarchy-shell shell toggle b47m4n.menu '{\"menu\":\"root\"}'")
+    }
+  }
+}

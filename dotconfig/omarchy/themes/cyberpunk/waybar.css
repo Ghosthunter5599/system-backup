@@ -1,0 +1,115 @@
+@define-color foreground #26bdfd;
+@define-color background #9a0000;
+@define-color glow #b5e4f4;
+@define-color bordercolor #ff4040;
+/* hex for new dark red background is #400000 for tooltip and #320000 for waybar */
+
+window#waybar {
+  background-color: rgba(50, 0, 0, 0.5);
+  border-bottom: 2px solid @bordercolor;
+}
+
+window#waybar arrow,
+window#waybar box,
+window#waybar button,
+window#waybar widget,
+window#waybar label,
+window#waybar image,
+window#waybar window,
+window#waybar revealer,
+window#waybar decoration,
+window#waybar menuitem {
+  background-color: transparent;
+}
+
+tooltip label,
+tooltip box,
+tooltip decoration,
+tooltip > decoration {
+  background-color: transparent;
+}
+
+tooltip.background,
+window#waybar menu {
+  background-color: rgba(64, 0, 0, 0.5);
+  border: 1px solid @bordercolor;
+}
+
+tooltip label,
+window#waybar menuitem {
+  color: @foreground;
+  animation: terminal-glow 7.5s ease-in-out infinite alternate;
+}
+
+window#waybar menuitem:hover {
+  background: rgba(5, 39, 54, 0.75);
+  border: 1px solid @foreground;
+}
+
+@keyframes terminal-glow {
+  from {
+    text-shadow:
+      0 0 1px @glow,
+      0 0 2px @glow;
+  }
+  to {
+    text-shadow:
+      0 0 3px @glow,
+      0 0 4px @glow;
+  }
+}
+
+@keyframes glitch {
+  from {
+    opacity: 1;
+    text-shadow: 0 0 4px @background;
+    color: @background;
+  }
+  to {
+    opacity: 0.85;
+    text-shadow:
+      -0.75px 0 @background,
+      0.75px 0 @foreground;
+    color: @background;
+  }
+}
+
+#memory,
+#clock,
+#cpu,
+#battery,
+#pulseaudio,
+#bluetooth,
+#network,
+#custom-update,
+#custom-omarchy,
+#custom-expand-icon,
+#custom-voxtype {
+  text-shadow:
+    0 0 4px @glow,
+    0 0 8px @glow;
+  animation: terminal-glow 5s ease-in-out infinite alternate;
+}
+
+#workspaces button label {
+  text-shadow:
+    0 0 4px @glow,
+    0 0 8px @glow;
+  animation: terminal-glow 5s ease-in-out infinite alternate;
+}
+
+#workspaces button.active {
+  color: green;
+  text-shadow:
+    -1px 0 @glow,
+    1px 0 @foreground,
+    0 0 4px @glow;
+  animation: glitch 0.3s ease-in-out infinite alternate;
+}
+
+.modules-right,
+.modules-left,
+.modules-center {
+  padding: 0.3rem 0.7rem;
+  margin: 5px 0px;
+}

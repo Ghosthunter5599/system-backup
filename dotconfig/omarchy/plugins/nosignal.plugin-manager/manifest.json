@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "nosignal.plugin-manager",
+  "name": "Plugin Manager",
+  "version": "0.2.1",
+  "author": "Gavin Nugent",
+  "license": "MIT",
+  "description": "On/off switches for installed shell plugins, and removal for third-party ones: your plugins up top, optional first-party bar widgets in a twirl-down below, alphabetical within each. The list scrolls when it overflows. Core shell plugins are hidden. Summon with: omarchy-shell shell toggle nosignal.plugin-manager",
+  "kinds": ["panel", "bar-widget"],
+  "entryPoints": {
+    "panel": "Panel.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Plugin Manager",
+    "description": "Bar icon that toggles the plugin-manager panel",
+    "category": "System",
+    "defaultSection": "right",
+    "allowMultiple": false
+  }
+}

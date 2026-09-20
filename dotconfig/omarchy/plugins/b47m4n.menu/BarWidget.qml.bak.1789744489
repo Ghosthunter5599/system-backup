@@ -1,0 +1,336 @@
+import QtQuick
+import QtQuick.Effects
+import qs.Commons
+import qs.Ui
+
+BarWidget {
+  id: root
+  moduleName: "b47m4n.menu"
+
+  readonly property real iconHeight: Math.max(10, Math.round(Style.font.body * 1.05))
+  readonly property real iconWidth: Math.round(iconHeight * (175.75 / 59.6211))
+
+  implicitWidth: button.implicitWidth
+  implicitHeight: button.implicitHeight
+
+  WidgetButton {
+    id: button
+    anchors.fill: parent
+    bar: root.bar
+    labelVisible: false
+    hasVisualContent: true
+    horizontalMargin: 8
+    fixedWidth: vertical ? -1 : Math.round(root.iconWidth + scaledHorizontalMargin * 2)
+    fixedHeight: vertical ? Math.round(root.iconHeight + scaledVerticalPadding * 2) : -1
+
+    Item {
+      id: iconContainer
+      anchors.centerIn: parent
+      width: root.iconWidth
+      height: root.iconHeight
+
+      Image {
+        id: logoImage
+        anchors.fill: parent
+        source: Qt.resolvedUrl("assets/batman-seeklogo.svg")
+        fillMode: Image.PreserveAspectFit
+        sourceSize.width: Math.round(root.iconWidth * Screen.devicePixelRatio * 2)
+        sourceSize.height: Math.round(root.iconHeight * Screen.devicePixelRatio * 2)
+        smooth: true
+        mipmap: true
+        visible: false
+      }
+
+      property real pulseFactor: 0.35
+      readonly property bool isOvercharged: button.tooltipHovered || button.active
+      property bool electricActive: false
+      property int arcSeed: 0
+
+      SequentialAnimation on pulseFactor {
+        id: pulseAnim
+        running: true
+        loops: Animation.Infinite
+
+        NumberAnimation {
+          from: 0.25
+          to: 1.0
+          duration: 1600
+          easing.type: Easing.InOutSine
+        }
+        NumberAnimation {
+          from: 1.0
+          to: 0.25
+          duration: 1600
+          easing.type: Easing.InOutSine
+        }
+      }
+
+      // Periodic EMP discharge burst when idle
+      Timer {
+        id: idleSparkTimer
+        interval: 2800
+        running: !iconContainer.isOvercharged
+        repeat: true
+        onTriggered: {
+          iconContainer.electricActive = true
+          burstTimer.restart()
+        }
+      }
+
+      // Burst duration for idle crackle
+      Timer {
+        id: burstTimer
+        interval: 220
+        repeat: false
+        onTriggered: {
+          if (!iconContainer.isOvercharged) {
+            iconContainer.electricActive = false
+            lightningCanvas.requestPaint()
+          }
+        }
+      }
+
+      // High-Frequency EMP Crackle Timer (for hover / burst updates)
+      Timer {
+        id: crackleTimer
+        interval: 40
+        running: iconContainer.isOvercharged || iconContainer.electricActive
+        repeat: true
+        onTriggered: {
+          iconContainer.arcSeed = Math.floor(Math.random() * 1000)
+          lightningCanvas.requestPaint()
+        }
+      }
+
+      onIsOverchargedChanged: {
+        electricActive = isOvercharged
+        lightningCanvas.requestPaint()
+      }
+
+      readonly property color glowColor: button.active && button.useActiveColor ? button.activeColor : Qt.lighter(Color.accent, 1.15)
+
+      // Container for all glow passes - controls breathing pulse & hover stay-lit
+      Item {
+        id: glowContainer
+        anchors.fill: parent
+        opacity: (button.tooltipHovered || button.active) ? 1.0 : iconContainer.pulseFactor
+
+        Behavior on opacity {
+          enabled: button.tooltipHovered || button.active
+          NumberAnimation { duration: 250; easing.type: Easing.OutCubic }
+        }
+
+        // Outer neon bloom (Tightened radius)
+        Item {
+          anchors.centerIn: parent
+          width: Math.round(root.iconWidth * 1.30)
+          height: Math.round(root.iconHeight * 1.30)
+
+          Image {
+            id: glowImgOuter
+            anchors.fill: parent
+            source: logoImage.source
+            fillMode: Image.PreserveAspectFit
+            sourceSize.width: Math.round(parent.width * Screen.devicePixelRatio * 2)
+            sourceSize.height: Math.round(parent.height * Screen.devicePixelRatio * 2)
+            smooth: true
+            mipmap: true
+            visible: false
+          }
+
+          MultiEffect {
+            anchors.fill: parent
+            source: glowImgOuter
+            colorization: 1.0
+            colorizationColor: iconContainer.glowColor
+            blurEnabled: true
+            blur: 0.8
+            blurMax: 20
+            blurMultiplier: 1.2
+            opacity: 0.65
+
+            Behavior on colorizationColor {
+              enabled: !button.bar || button.bar.foregroundAnimationEnabled
+              ColorAnimation { duration: 160 }
+            }
+          }
+        }
+
+        // Mid radiant neon glow (Tightened radius)
+        Item {
+          anchors.centerIn: parent
+          width: Math.round(root.iconWidth * 1.18)
+          height: Math.round(root.iconHeight * 1.18)
+
+          Image {
+            id: glowImgMid
+            anchors.fill: parent
+            source: logoImage.source
+            fillMode: Image.PreserveAspectFit
+            sourceSize.width: Math.round(parent.width * Screen.devicePixelRatio * 2)
+            sourceSize.height: Math.round(parent.height * Screen.devicePixelRatio * 2)
+            smooth: true
+            mipmap: true
+            visible: false
+          }
+
+          MultiEffect {
+            anchors.fill: parent
+            source: glowImgMid
+            colorization: 1.0
+            colorizationColor: iconContainer.glowColor
+            blurEnabled: true
+            blur: 0.5
+            blurMax: 16
+            blurMultiplier: 0.9
+            opacity: 0.8
+
+            Behavior on colorizationColor {
+              enabled: !button.bar || button.bar.foregroundAnimationEnabled
+              ColorAnimation { duration: 160 }
+            }
+          }
+        }
+
+        // Tight edge halo (Contoured)
+        Item {
+          anchors.centerIn: parent
+          width: Math.round(root.iconWidth * 1.08)
+          height: Math.round(root.iconHeight * 1.08)
+
+          Image {
+            id: glowImgInner
+            anchors.fill: parent
+            source: logoImage.source
+            fillMode: Image.PreserveAspectFit
+            sourceSize.width: Math.round(parent.width * Screen.devicePixelRatio * 2)
+            sourceSize.height: Math.round(parent.height * Screen.devicePixelRatio * 2)
+            smooth: true
+            mipmap: true
+            visible: false
+          }
+
+          MultiEffect {
+            anchors.fill: parent
+            source: glowImgInner
+            colorization: 1.0
+            colorizationColor: iconContainer.glowColor
+            blurEnabled: true
+            blur: 0.25
+            blurMax: 10
+            blurMultiplier: 0.6
+            opacity: 0.9
+
+            Behavior on colorizationColor {
+              enabled: !button.bar || button.bar.foregroundAnimationEnabled
+              ColorAnimation { duration: 160 }
+            }
+          }
+        }
+      }
+
+      // Crisp Foreground Core Logo
+      MultiEffect {
+        anchors.fill: logoImage
+        source: logoImage
+        colorization: 1.0
+        colorizationColor: button.active && button.useActiveColor ? button.activeColor : button.foreground
+
+        Behavior on colorizationColor {
+          enabled: !button.bar || button.bar.foregroundAnimationEnabled
+          ColorAnimation { duration: 160 }
+        }
+      }
+
+      // Electric Lightning Arcs Canvas (EMP Overcharge)
+      Canvas {
+        id: lightningCanvas
+        anchors.centerIn: parent
+        width: Math.round(root.iconWidth * 1.35)
+        height: Math.round(root.iconHeight * 1.45)
+        renderTarget: Canvas.FramebufferObject
+        renderStrategy: Canvas.Immediate
+        antialiasing: true
+        visible: iconContainer.isOvercharged || iconContainer.electricActive
+
+        function drawSegment(ctx, x1, y1, x2, y2, displace, depth) {
+          if (depth <= 0) {
+            ctx.lineTo(x2, y2);
+            return;
+          }
+          var mx = (x1 + x2) / 2 + (Math.random() - 0.5) * displace;
+          var my = (y1 + y2) / 2 + (Math.random() - 0.5) * displace;
+          drawSegment(ctx, x1, y1, mx, my, displace * 0.55, depth - 1);
+          drawSegment(ctx, mx, my, x2, y2, displace * 0.55, depth - 1);
+        }
+
+        onPaint: {
+          var ctx = getContext("2d");
+          ctx.clearRect(0, 0, width, height);
+          if (!iconContainer.isOvercharged && !iconContainer.electricActive) return;
+
+          var w = width;
+          var h = height;
+          var cx = w / 2;
+          var cy = h / 2;
+
+          var leftTipX = w * 0.12;
+          var leftTipY = h * 0.28;
+          var rightTipX = w * 0.88;
+          var rightTipY = h * 0.28;
+          var headX = cx;
+          var headY = h * 0.32;
+          var leftWingMidX = w * 0.28;
+          var leftWingMidY = h * 0.48;
+          var rightWingMidX = w * 0.72;
+          var rightWingMidY = h * 0.48;
+          var tailX = cx;
+          var tailY = h * 0.82;
+
+          var arcs = [
+            { x1: leftTipX, y1: leftTipY, x2: headX, y2: headY, disp: 5, depth: 3 },
+            { x1: headX, y1: headY, x2: rightTipX, y2: rightTipY, disp: 5, depth: 3 },
+            { x1: leftWingMidX, y1: leftWingMidY, x2: rightWingMidX, y2: rightWingMidY, disp: 4, depth: 3 }
+          ];
+
+          if (Math.random() > 0.4) {
+            arcs.push({ x1: leftWingMidX, y1: leftWingMidY, x2: tailX, y2: tailY, disp: 4, depth: 2 });
+          }
+          if (Math.random() > 0.4) {
+            arcs.push({ x1: rightWingMidX, y1: rightWingMidY, x2: tailX, y2: tailY, disp: 4, depth: 2 });
+          }
+
+          // Pass 1: Outer glowing electric corona (Theme Accent Color)
+          ctx.lineWidth = 2.4;
+          ctx.strokeStyle = iconContainer.glowColor;
+          ctx.lineCap = "round";
+          ctx.lineJoin = "round";
+          for (var i = 0; i < arcs.length; i++) {
+            var a = arcs[i];
+            ctx.beginPath();
+            ctx.moveTo(a.x1, a.y1);
+            drawSegment(ctx, a.x1, a.y1, a.x2, a.y2, a.disp, a.depth);
+            ctx.stroke();
+          }
+
+          // Pass 2: White-hot lightning core
+          ctx.lineWidth = 1.0;
+          ctx.strokeStyle = "#ffffff";
+          for (var j = 0; j < arcs.length; j++) {
+            var b = arcs[j];
+            ctx.beginPath();
+            ctx.moveTo(b.x1, b.y1);
+            drawSegment(ctx, b.x1, b.y1, b.x2, b.y2, b.disp * 0.8, b.depth);
+            ctx.stroke();
+          }
+        }
+      }
+    }
+
+    onPressed: function(btn) {
+      if (!root.bar) return
+      if (btn === Qt.RightButton) root.bar.run("xdg-terminal-exec")
+      else root.bar.run("omarchy-shell shell toggle b47m4n.menu '{\"menu\":\"root\"}'")
+    }
+  }
+}

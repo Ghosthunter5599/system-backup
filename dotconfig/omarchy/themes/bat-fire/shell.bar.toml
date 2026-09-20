@@ -1,0 +1,8 @@
+[bar]
+background       = "#472218"
+background-alpha = 0.82
+text             = "#e5d3ce"
+active           = "#ff8c70"
+scale-with-font  = true
+size-horizontal  = 26
+size-vertical    = 28

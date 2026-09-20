@@ -1,0 +1,8 @@
+# Converted Omarchy Shell Theme Configuration
+# Source: config/V1.7
+
+[font]
+base-size = 16
+
+[controls]
+border-radius = 3

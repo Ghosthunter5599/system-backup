@@ -1,0 +1,11 @@
+antigravity-cli
+binwalk-git
+crtty-git
+discord-latest-bin
+google-chrome
+hyprmod
+linux-wifi-hotspot
+snapd
+steghide-bin
+tor-browser-bin
+voyager-disco

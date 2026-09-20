@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "ssupt.audio-control",
+  "name": "Advanced Audio Control",
+  "version": "0.3.0",
+  "author": "ssupt",
+  "description": "Adds application playback and recording routing, volume boost, balance, device ports, and Bluetooth audio controls to Omarchy",
+  "kinds": [
+    "bar-widget",
+    "panel"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml",
+    "panel": "AdvancedAudio.qml"
+  },
+  "barWidget": {
+    "displayName": "Advanced Audio Control",
+    "description": "Adds application playback and recording routing, volume boost, balance, device ports, and Bluetooth audio controls to Omarchy",
+    "category": "Audio",
+    "allowMultiple": false
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.audio"
+  }
+}

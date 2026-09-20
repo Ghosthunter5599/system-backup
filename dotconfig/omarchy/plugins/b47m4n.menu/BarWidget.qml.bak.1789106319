@@ -1,0 +1,76 @@
+import QtQuick
+import QtQuick.Effects
+import qs.Commons
+import qs.Ui
+
+BarWidget {
+  id: root
+  moduleName: "b47m4n.menu"
+
+  readonly property real iconHeight: Math.max(10, Math.round(Style.font.body * 1.05))
+  readonly property real iconWidth: Math.round(iconHeight * (175.75 / 59.6211))
+
+  implicitWidth: button.implicitWidth
+  implicitHeight: button.implicitHeight
+
+  WidgetButton {
+    id: button
+    anchors.fill: parent
+    bar: root.bar
+    labelVisible: false
+    hasVisualContent: true
+    horizontalMargin: 8
+    fixedWidth: vertical ? -1 : Math.round(root.iconWidth + scaledHorizontalMargin * 2)
+    fixedHeight: vertical ? Math.round(root.iconHeight + scaledVerticalPadding * 2) : -1
+
+    Item {
+      id: iconContainer
+      anchors.centerIn: parent
+      width: root.iconWidth
+      height: root.iconHeight
+
+      Image {
+        id: logoImage
+        anchors.fill: parent
+        source: Qt.resolvedUrl("assets/batman-seeklogo.svg")
+        fillMode: Image.PreserveAspectFit
+        sourceSize.width: Math.round(root.iconWidth * Screen.devicePixelRatio * 2)
+        sourceSize.height: Math.round(root.iconHeight * Screen.devicePixelRatio * 2)
+        smooth: true
+        mipmap: true
+        visible: false
+      }
+
+      MultiEffect {
+        anchors.fill: logoImage
+        source: logoImage
+        colorization: 1.0
+        colorizationColor: button.active && button.useActiveColor ? button.activeColor : button.foreground
+
+        shadowEnabled: true
+        shadowColor: button.active && button.useActiveColor ? button.activeColor : Color.accent
+        shadowBlur: 0.75
+        shadowOpacity: 1.0
+        shadowScale: 1.08
+        shadowHorizontalOffset: 0
+        shadowVerticalOffset: 0
+
+        Behavior on colorizationColor {
+          enabled: !button.bar || button.bar.foregroundAnimationEnabled
+          ColorAnimation { duration: 160 }
+        }
+
+        Behavior on shadowColor {
+          enabled: !button.bar || button.bar.foregroundAnimationEnabled
+          ColorAnimation { duration: 160 }
+        }
+      }
+    }
+
+    onPressed: function(btn) {
+      if (!root.bar) return
+      if (btn === Qt.RightButton) root.bar.run("xdg-terminal-exec")
+      else root.bar.run("omarchy-shell shell toggle b47m4n.menu '{\"menu\":\"root\"}'")
+    }
+  }
+}

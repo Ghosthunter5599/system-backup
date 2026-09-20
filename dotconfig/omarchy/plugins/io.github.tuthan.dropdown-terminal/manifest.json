@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.tuthan.dropdown-terminal",
+  "name": "Dropdown Terminal",
+  "version": "1.0.1",
+  "author": "Hung Vo",
+  "license": "MIT",
+  "description": "Summon the configured default terminal in a floating special workspace",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Dropdown Terminal",
+    "description": "Toggle the default terminal as a dropdown",
+    "category": "Utilities",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

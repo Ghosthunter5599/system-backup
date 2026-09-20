@@ -1,0 +1,109 @@
+#!/bin/bash
+# omarchy:summary=Manage multi-device audio stream and latency synchronization
+# omarchy:args=[--clear | --get-slaves | --set-latency <ms> | --get-latency | sink_names...]
+# omarchy:examples=audio-multi-stream-set sink1 sink2 | audio-multi-stream-set --set-latency 140
+
+set -euo pipefail
+
+action="${1:-}"
+
+if [[ "$action" == "--get-slaves" ]]; then
+  arg=$(timeout 2 pactl list modules short 2>/dev/null | awk '$2 == "module-combine-sink"' | head -n 1 || true)
+  if [[ -n "$arg" ]]; then
+    slaves=$(grep -oP 'slaves=\K[^ \t]+' <<<"$arg" || true)
+    if [[ -n "$slaves" ]]; then
+      jq -cn --arg s "$slaves" '$s | split(",")'
+      exit 0
+    fi
+  fi
+  echo "[]"
+  exit 0
+fi
+
+if [[ "$action" == "--set-latency" ]]; then
+  offset_ms="${2:-0}"
+  offset_usec=$(( offset_ms * 1000 ))
+  while IFS=$'\t' read -r card port; do
+    [[ -n "$card" && -n "$port" ]] || continue
+    timeout 2 pactl set-port-latency-offset "$card" "$port" "$offset_usec" 2>/dev/null || true
+  done < <(timeout 2 pactl -f json list cards 2>/dev/null | jq -r '.[] | select(.properties."device.api" == "bluez5") | [.name, (.active_port // "headphone-output")] | @tsv' || true)
+  exit 0
+fi
+
+if [[ "$action" == "--get-latency" ]]; then
+  lat=$(timeout 2 pactl -f json list cards 2>/dev/null | jq -r '.[] | select(.properties."device.api" == "bluez5") | .ports["headphone-output"].latency_offset // "0 usec"' | head -n 1 || echo "0 usec")
+  usec=$(grep -oP '^[0-9]+' <<<"$lat" || echo "0")
+  echo $(( usec / 1000 ))
+  exit 0
+fi
+
+# Find all loaded combine-sink modules and unload them
+while read -r mod; do
+  [[ -n "$mod" ]] && timeout 2 pactl unload-module "$mod" 2>/dev/null || true
+done < <(timeout 2 pactl list modules short 2>/dev/null | awk '$2 == "module-combine-sink" {print $1}')
+
+# If --clear or no arguments, reset latency and exit cleanly
+if [[ $# -eq 0 || "$action" == "--clear" ]]; then
+  # Reset bluetooth latency offset on single-device
+  while IFS=$'\t' read -r card port; do
+    [[ -n "$card" && -n "$port" ]] || continue
+    timeout 2 pactl set-port-latency-offset "$card" "$port" 0 2>/dev/null || true
+  done < <(timeout 2 pactl -f json list cards 2>/dev/null | jq -r '.[] | select(.properties."device.api" == "bluez5") | [.name, (.active_port // "headphone-output")] | @tsv' || true)
+  exit 0
+fi
+
+# If single sink, set as default
+if [[ $# -eq 1 ]]; then
+  sink="$1"
+  timeout 2 pactl set-default-sink "$sink" 2>/dev/null || true
+  node_id=$(timeout 2 pw-cli info "$sink" 2>/dev/null | grep -oP 'id: \K[0-9]+' | head -n 1 || true)
+  [[ -n "$node_id" ]] && timeout 2 wpctl set-default "$node_id" 2>/dev/null || true
+  
+  # Reset bluetooth latency offset for single device
+  while IFS=$'\t' read -r card port; do
+    [[ -n "$card" && -n "$port" ]] || continue
+    timeout 2 pactl set-port-latency-offset "$card" "$port" 0 2>/dev/null || true
+  done < <(timeout 2 pactl -f json list cards 2>/dev/null | jq -r '.[] | select(.properties."device.api" == "bluez5") | [.name, (.active_port // "headphone-output")] | @tsv' || true)
+
+  # Move active sink inputs
+  for input in $(timeout 2 pactl -f json list sink-inputs 2>/dev/null | jq -r '.[].index'); do
+    timeout 2 pactl move-sink-input "$input" "$sink" 2>/dev/null || true
+  done
+  exit 0
+fi
+
+# Multiple sinks: check if Bluetooth is mixed with Analog/Wired
+has_bluetooth=false
+has_analog=false
+for s in "$@"; do
+  if [[ "$s" =~ bluez ]]; then has_bluetooth=true; fi
+  if [[ "$s" =~ alsa ]]; then has_analog=true; fi
+done
+
+if [[ "$has_bluetooth" == true && "$has_analog" == true ]]; then
+  # Default Bluetooth latency offset to 140ms for acoustic alignment with speakers
+  while IFS=$'\t' read -r card port; do
+    [[ -n "$card" && -n "$port" ]] || continue
+    timeout 2 pactl set-port-latency-offset "$card" "$port" 140000 2>/dev/null || true
+  done < <(timeout 2 pactl -f json list cards 2>/dev/null | jq -r '.[] | select(.properties."device.api" == "bluez5") | [.name, (.active_port // "headphone-output")] | @tsv' || true)
+else
+  # Dual Bluetooth or Dual Wired
+  while IFS=$'\t' read -r card port; do
+    [[ -n "$card" && -n "$port" ]] || continue
+    timeout 2 pactl set-port-latency-offset "$card" "$port" 0 2>/dev/null || true
+  done < <(timeout 2 pactl -f json list cards 2>/dev/null | jq -r '.[] | select(.properties."device.api" == "bluez5") | [.name, (.active_port // "headphone-output")] | @tsv' || true)
+fi
+
+slaves=$(IFS=,; echo "$*")
+mod_id=$(timeout 2 pactl load-module module-combine-sink sink_name=combined_stream slaves="$slaves" sink_properties=device.description="Simultaneous\ Output" 2>/dev/null || true)
+
+if [[ -n "$mod_id" ]]; then
+  sleep 0.1
+  timeout 2 pactl set-default-sink combined_stream 2>/dev/null || true
+  node_id=$(timeout 2 pw-cli info combined_stream 2>/dev/null | grep -oP 'id: \K[0-9]+' | head -n 1 || true)
+  [[ -n "$node_id" ]] && timeout 2 wpctl set-default "$node_id" 2>/dev/null || true
+  
+  for input in $(timeout 2 pactl -f json list sink-inputs 2>/dev/null | jq -r '.[].index'); do
+    timeout 2 pactl move-sink-input "$input" combined_stream 2>/dev/null || true
+  done
+fi

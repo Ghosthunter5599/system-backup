@@ -1,0 +1,7 @@
+.agent-memory/
+.kaal/
+*.png
+*.log
+!docs/panel.png
+!docs/hotspot-panel.png
+!preview.png

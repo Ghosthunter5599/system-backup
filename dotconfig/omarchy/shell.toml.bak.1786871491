@@ -1,0 +1,8 @@
+# Converted Omarchy Shell Theme Configuration
+# Source: batsymbol
+
+[font]
+base-size = 14
+
+[controls]
+border-radius = 20

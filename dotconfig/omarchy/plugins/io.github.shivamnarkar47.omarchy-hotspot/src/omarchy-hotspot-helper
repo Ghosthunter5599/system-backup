@@ -1,0 +1,416 @@
+#!/usr/bin/env bash
+# omarchy-hotspot-helper: concurrent Wi-Fi hotspot for the local.hotspot bar
+# plugin. The station interface stays connected to the current network while
+# a virtual AP interface (ap0) serves clients via hostapd + dnsmasq. Traffic
+# is NATed through the default route, so any uplink (Ethernet, tether,
+# VLAN-tagged interface, or the Wi-Fi network itself) is shared.
+#
+# The AP must mirror the station's channel AND channel width: iwlwifi keeps a
+# single phy context per radio and silently fails to beacon otherwise.
+#
+# Started via pkexec by the panel; a polkit rule makes that passwordless.
+set -euo pipefail
+
+VIF="ap0"
+RUN_DIR="/run/omarchy-hotspot"
+STATE_DIR="/var/lib/omarchy-hotspot"
+PASS_FILE="$STATE_DIR/password"
+AP_CONF="$RUN_DIR/hostapd.conf"
+AP_PID="$RUN_DIR/hostapd.pid"
+AP_SUBNET="10.42.0.0/24"
+AP_GATEWAY="10.42.0.1"
+
+station_iface() {
+  nmcli -t -f DEVICE,TYPE device status 2>/dev/null | grep -E ':wifi$' | head -1 | cut -d: -f1
+}
+
+station_channel() {
+  local iface
+  iface="$(station_iface)"
+  [ -n "$iface" ] || return 0
+  iw dev "$iface" info 2>/dev/null | awk '/channel/ { print $2; exit }'
+}
+
+# Channel width the station uses ("20", "40", "80", "160"). iw prints one
+# line: "channel 1 (2412 MHz), width: 40 MHz, center1: 2422 MHz".
+station_width() {
+  local iface
+  iface="$(station_iface)"
+  [ -n "$iface" ] || return 0
+  iw dev "$iface" info 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i == "width:") { print $(i + 1); exit } }'
+}
+
+# "plus" | "minus" | "" — secondary channel direction from center frequency.
+station_center_offset() {
+  local iface ch primary center
+  iface="$(station_iface)"
+  [ -n "$iface" ] || return 0
+  ch="$(station_channel)"
+  center="$(iw dev "$iface" info 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i == "center1:") { print $(i + 1); exit } }')"
+  [ -n "$center" ] || return 0
+  if [ "$ch" -le 14 ]; then
+    primary=$((2412 + (ch - 1) * 5))
+  else
+    primary=$((5000 + ch * 5))
+  fi
+  if [ "$center" -gt "$primary" ]; then
+    echo "plus"
+  elif [ "$center" -lt "$primary" ]; then
+    echo "minus"
+  fi
+}
+
+# Center frequency (MHz) of the station's phy context (center1). iwlwifi
+# keeps a single phy context per radio, so the AP must use this exact center
+# (not an arbitrary one derived from the primary channel) or hostapd fails
+# with "Frequency not present (seg0)"/"Hardware does not support configured
+# channel" on asymmetric primary channels (e.g. ch157 in an 80 MHz block
+# centered at 5775 MHz).
+station_vht_center() {
+  local iface
+  iface="$(station_iface)"
+  [ -n "$iface" ] || return 0
+  iw dev "$iface" info 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i == "center1:") { print $(i + 1); exit } }'
+}
+
+ap_ssid() {
+  echo "OmarchyHotspot"
+}
+
+vif_exists() {
+  iw dev "$VIF" info >/dev/null 2>&1
+}
+
+hotspot_on() {
+  systemctl is-active --quiet omarchy-hotspot 2>/dev/null
+}
+
+# The human who invoked us (root when run directly). The password must stay
+# out of other local users' reach but still be readable by the owner — the bar
+# widget (running as that user) reads it to render the join QR.
+real_user() {
+  if [ -n "${PKEXEC_UID:-}" ]; then
+    id -nu "$PKEXEC_UID"
+  elif [ -n "${SUDO_USER:-}" ]; then
+    echo "$SUDO_USER"
+  elif logname >/dev/null 2>&1; then
+    logname
+  else
+    id -un
+  fi
+}
+
+protect_passfile() {
+  chown "$(real_user)" "$PASS_FILE" 2>/dev/null || true
+  chmod 600 "$PASS_FILE"
+}
+
+ensure_state() {
+  mkdir -p "$STATE_DIR" "$RUN_DIR"
+  chmod 755 "$STATE_DIR"
+  chmod 700 "$RUN_DIR"
+  if [ ! -s "$PASS_FILE" ]; then
+    tr -dc 'A-Za-z0-9' </dev/urandom | head -c 10 >"$PASS_FILE" || true
+  fi
+  protect_passfile
+}
+
+ensure_vif() {
+  vif_exists && return 0
+  local iface phy
+  iface="$(station_iface)"
+  [ -n "$iface" ] || { echo "no-wifi-device" >&2; return 1; }
+  phy="phy$(iw dev "$iface" info | awk '/wiphy/ { print $2; exit }')"
+  iw phy "$phy" interface add "$VIF" type __ap
+  for _ in $(seq 1 20); do
+    vif_exists && return 0
+    sleep 0.2
+  done
+  echo "vif-create-timeout" >&2
+  return 1
+}
+
+write_hostapd_conf() {
+  local channel freq mode ht seg0 seg1 chwidth
+  channel="$(station_channel)"
+  if [ -z "$channel" ]; then
+    channel=1
+  fi
+  if [ "$channel" -le 14 ]; then
+    mode="g"
+    freq=$((2412 + (channel - 1) * 5))
+  else
+    mode="a"
+    freq=$((5000 + channel * 5))
+  fi
+
+  # Mirror the station's width AND phy-context center (center1) so the
+  # firmware beacons on the shared phy. Using the actual center1 avoids the
+  # "Frequency not present (seg0)" failure when the primary channel sits
+  # asymmetrically inside the VHT80/160 block.
+  case "$(station_width)" in
+    40)
+      if [ "$(station_center_offset)" = "minus" ]; then
+        ht="[HT40-]"
+      else
+        ht="[HT40+]"
+      fi
+      ;;
+    80)
+      ht="[HT40+]"
+      chwidth=1
+      local vhtcenter80
+      vhtcenter80="$(station_vht_center)"
+      if [ -n "$vhtcenter80" ]; then
+        seg0=$(((vhtcenter80 - 5000) / 5))
+      else
+        # Fallback: primary at the low edge of the 80 MHz block.
+        seg0=$(((freq + 20 - 5000) / 5))
+      fi
+      ;;
+    160)
+      ht="[HT40+]"
+      chwidth=2
+      local vhtcenter
+      vhtcenter="$(station_vht_center)"
+      seg0=$(((vhtcenter - 5000) / 5))
+      # seg1 = center of the 80 MHz half that does NOT hold the primary.
+      if [ "$freq" -lt "$vhtcenter" ]; then
+        seg1=$(((vhtcenter + 40 - 5000) / 5))
+      else
+        seg1=$(((vhtcenter - 40 - 5000) / 5))
+      fi
+      ;;
+    *)
+      ht="[HT20]"
+      ;;
+  esac
+
+  cat >"$AP_CONF" <<EOF
+interface=$VIF
+driver=nl80211
+ssid=$(ap_ssid)
+hw_mode=$mode
+channel=$channel
+wpa=2
+wpa_passphrase=$(cat "$PASS_FILE")
+wpa_key_mgmt=WPA-PSK
+rsn_pairwise=CCMP
+ht_capab=$ht
+${seg0:+ieee80211ac=1}
+${seg0:+vht_oper_chwidth=$chwidth}
+${seg0:+vht_oper_centr_freq_seg0_idx=$seg0}
+${seg1:+vht_oper_centr_freq_seg1_idx=$seg1}
+ignore_broadcast_ssid=0
+EOF
+  chmod 600 "$AP_CONF"
+}
+
+start_ap() {
+  ensure_state
+  ensure_vif
+  write_hostapd_conf
+
+  ip link set "$VIF" up
+  systemctl stop omarchy-hotspot 2>/dev/null || true
+  # Transient unit: keeps hostapd in foreground (no -B fork bugs), logs to
+  # journald, and survives the pkexec session.
+  if ! systemd-run --unit=omarchy-hotspot --collect hostapd "$AP_CONF"; then
+    iw dev "$VIF" del 2>/dev/null || true
+    exit 1
+  fi
+  sleep 1
+  if ! systemctl is-active --quiet omarchy-hotspot; then
+    echo "hostapd failed to start (journalctl -u omarchy-hotspot)" >&2
+    iw dev "$VIF" del 2>/dev/null || true
+    exit 1
+  fi
+  ip addr replace "$AP_GATEWAY/24" dev "$VIF" 2>/dev/null || true
+  ip link set "$VIF" up
+
+  # Forward + NAT through the default route (any uplink, VLAN included).
+  sysctl -q -w net.ipv4.ip_forward=1
+  iptables -t nat -C POSTROUTING -s "$AP_SUBNET" ! -d "$AP_SUBNET" -j MASQUERADE 2>/dev/null \
+    || iptables -t nat -A POSTROUTING -s "$AP_SUBNET" ! -d "$AP_SUBNET" -j MASQUERADE
+  iptables -C FORWARD -i "$VIF" -j ACCEPT 2>/dev/null \
+    || iptables -I FORWARD -i "$VIF" -j ACCEPT
+  iptables -C FORWARD -o "$VIF" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null \
+    || iptables -I FORWARD -o "$VIF" -m state --state RELATED,ESTABLISHED -j ACCEPT
+  # INPUT: UFW's default DROP policy eats client DHCP/DNS (ports 67/53).
+  # WPA2-authenticated AP clients are trusted; accept everything from ap0.
+  iptables -C INPUT -i "$VIF" -j ACCEPT 2>/dev/null \
+    || iptables -I INPUT -i "$VIF" -j ACCEPT
+
+  # DHCP/DNS for clients; explicit upstreams (systemd-resolved's, else CDN).
+  local servers=()
+  while read -r ns; do
+    case "$ns" in
+      127.*|::1|"") ;;
+      *) servers+=(--server="$ns") ;;
+    esac
+  done < <(grep '^nameserver' /run/systemd/resolve/resolv.conf 2>/dev/null | awk '{print $2}' || true)
+  if [ "${#servers[@]}" -eq 0 ]; then
+    servers=(--server=1.1.1.1 --server=1.0.0.1)
+  fi
+  systemctl stop omarchy-hotspot-dns 2>/dev/null || true
+  systemd-run --unit=omarchy-hotspot-dns --collect dnsmasq \
+    --keep-in-foreground \
+    --interface="$VIF" \
+    --bind-interfaces \
+    --except-interface=lo \
+    --no-resolv \
+    --log-dhcp \
+    "${servers[@]}" \
+    --dhcp-range=10.42.0.10,10.42.0.200,255.255.255.0,12h
+}
+
+stop_ap() {
+  systemctl stop omarchy-hotspot 2>/dev/null || true
+  systemctl stop omarchy-hotspot-dns 2>/dev/null || true
+  iptables -D INPUT -i "$VIF" -j ACCEPT 2>/dev/null || true
+  iptables -t nat -D POSTROUTING -s "$AP_SUBNET" ! -d "$AP_SUBNET" -j MASQUERADE 2>/dev/null || true
+  iptables -D FORWARD -i "$VIF" -j ACCEPT 2>/dev/null || true
+  iptables -D FORWARD -o "$VIF" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
+  # Fresh AP-mode vif on next start (hostapd/wpa leaves stale state otherwise).
+  iw dev "$VIF" del 2>/dev/null || true
+}
+
+uplink_iface() {
+  ip route get 8.8.8.8 2>/dev/null | awk '{ for (i=1; i<=NF; i++) if ($i == "dev") print $(i+1); exit }' || true
+}
+
+status_text() {
+  if ! hotspot_on; then
+    echo "off"
+    return
+  fi
+  local iface channel clients
+  iface="$(station_iface)"
+  channel="$(iw dev "$iface" info 2>/dev/null | awk '/channel/ { print $2; exit }')"
+  if [ -z "$channel" ]; then
+    channel="$(iw dev "$VIF" info 2>/dev/null | awk '/channel/ { print $2; exit }')"
+  fi
+  clients="$(iw dev "$VIF" station dump 2>/dev/null | grep -c '^Station' || true)"
+  # The passphrase is intentionally NOT echoed here; the bar reads it directly
+  # from the secret file (owned by the user) to keep it out of this channel.
+  echo "on $(ap_ssid) $(uplink_iface) ${channel:-} ${clients:-0}"
+}
+
+set_password() {
+  local newpass byte_len
+  # Read the passphrase from stdin (never argv) so it is not exposed via the
+  # process command line. Invoke as: printf '%s\n' "$pw" | helper set-password
+  # A single line is read, so the caller sends a trailing newline and need not
+  # close the stream (which would break repeated invocations).
+  IFS= read -r newpass
+  if [ -z "$newpass" ]; then
+    echo "No password provided on stdin" >&2
+    return 1
+  fi
+  # WPA2-PSK passphrase rules: 8-63 bytes of printable ASCII. Reject control
+  # characters, DEL, and any non-ASCII byte (UTF-8 would blow the 63-byte
+  # limit once encoded and could break hostapd.conf interpolation). Compare
+  # the total byte count against the printable-byte count so an embedded
+  # newline (which grep/command-substitution treat as a line break) is caught.
+  local total printable
+  total="$(printf '%s' "$newpass" | wc -c)"
+  printable="$(printf '%s' "$newpass" | LC_ALL=C tr -cd '[:print:]' | wc -c)"
+  if [ "$total" -ne "$printable" ]; then
+    echo "Password must contain only printable ASCII characters" >&2
+    return 1
+  fi
+  byte_len="$(printf '%s' "$newpass" | wc -c)"
+  if [ "$byte_len" -lt 8 ] || [ "$byte_len" -gt 63 ]; then
+    echo "Password must be between 8 and 63 characters" >&2
+    return 1
+  fi
+  ensure_state
+  printf '%s' "$newpass" >"$PASS_FILE"
+  protect_passfile
+  if hotspot_on; then
+    write_hostapd_conf
+    systemctl restart omarchy-hotspot
+    sleep 1
+    if ! systemctl is-active --quiet omarchy-hotspot; then
+      echo "hostapd failed to restart with the new password" >&2
+      return 1
+    fi
+  fi
+  echo "ok"
+}
+
+run_tests() {
+  # Compare daemonization modes; foreground worked, -B fails silently.
+  ensure_state
+  write_hostapd_conf
+  local iface phy
+  iface="$(station_iface)"
+  phy="phy$(iw dev "$iface" info 2>/dev/null | awk '/wiphy/ { print $2; exit }')"
+
+  echo "--- variant C: foreground with -f logfile ---"
+  iw dev "$VIF" del 2>/dev/null || true
+  iw phy "$phy" interface add "$VIF" type __ap 2>&1 | head -2
+  ip link set "$VIF" up 2>&1
+  timeout 5 hostapd -f "$RUN_DIR/test.log" "$AP_CONF" 2>&1 | head -5
+  echo "log:"; tail -3 "$RUN_DIR/test.log" 2>&1
+  iw dev "$VIF" del 2>/dev/null || true
+
+  echo "--- variant D: nohup background (no -B) ---"
+  iw phy "$phy" interface add "$VIF" type __ap 2>&1 | head -2
+  ip link set "$VIF" up 2>&1
+  nohup hostapd -P "$AP_PID" -f "$RUN_DIR/test2.log" "$AP_CONF" >/dev/null 2>&1 &
+  local pid=$!
+  sleep 3
+  echo "bg pid $pid alive: $(kill -0 $pid 2>/dev/null && echo yes || echo no)"
+  pgrep -a hostapd 2>&1 | head -2
+  echo "log:"; tail -3 "$RUN_DIR/test2.log" 2>&1
+  kill $pid 2>/dev/null || true
+  pkill -f "hostapd .*hostapd.conf" 2>/dev/null || true
+  iw dev "$VIF" del 2>/dev/null || true
+}
+
+# The passwordless pkexec polkit rule lets the bar run this helper as root.
+# Restrict that path to the subcommands the bar actually uses; diagnostic
+# subcommands (debug/sniff/test) stay available to direct root invocation
+# (e.g. `sudo omarchy-hotspot-helper debug`) but not via the passwordless path.
+helper_dispatch() {
+  case "$1" in
+    status) status_text ;;
+    toggle)
+      if hotspot_on; then
+        stop_ap
+      else
+        start_ap
+      fi
+      ;;
+    set-password) set_password ;;
+    *)
+      if [ -n "${PKEXEC_UID:-}" ]; then
+        echo "Subcommand '$1' is not permitted via pkexec" >&2
+        exit 2
+      fi
+      case "$1" in
+        test) run_tests ;;
+        sniff)
+          timeout 6 tcpdump -i "$VIF" -n -c 25 2>&1 | head -28
+          ;;
+        debug)
+          echo "--- hostapd.conf ---"
+          cat "$AP_CONF" 2>&1
+          echo "--- hostapd.log ---"
+          tail -10 "$RUN_DIR/hostapd.log" 2>&1
+          echo "--- ap0 TX ---"
+          ip -s link show "$VIF" 2>&1 | grep -A1 'TX:'
+          echo "--- hostapd procs ---"
+          pgrep -a hostapd 2>&1
+          ;;
+        *)
+          echo "usage: omarchy-hotspot-helper {status|toggle|set-password|debug|test}" >&2
+          exit 2
+          ;;
+      esac
+      ;;
+  esac
+}
+
+helper_dispatch "${1:-status}"

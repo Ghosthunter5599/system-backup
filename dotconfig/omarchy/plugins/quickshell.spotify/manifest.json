@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "id": "quickshell.spotify",
+  "name": "Omarchy Spotify",
+  "version": "1.0.2",
+  "author": "QuickshellSpotify",
+  "license": "MIT",
+  "description": "Spotify in Quickshell with all the features you need—using about 60 MB of memory versus roughly 950 MB for the official client.",
+  "kinds": [
+    "service",
+    "bar-widget",
+    "panel"
+  ],
+  "activation": "on-demand",
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "BarWidget.qml",
+    "panel": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Omarchy Spotify",
+    "description": "Spotify in Quickshell with all the features you need—using about 60 MB of memory versus roughly 950 MB for the official client.",
+    "category": "Media",
+    "aliases": [
+      "spotify",
+      "music",
+      "player"
+    ],
+    "allowMultiple": false,
+    "defaultSection": "left",
+    "defaults": {
+      "deviceName": "Omarchy Spotify",
+      "idleShutdownMinutes": 15,
+      "showMiniPlayer": "On",
+      "shortcutPlayer": "Omarchy default",
+      "showTrackTitle": "On",
+      "showArtistName": "Off",
+      "scrollBarText": "Off",
+      "scrollSpeed": "1",
+      "audioQuality": "320 kbps"
+    },
+    "schema": [
+      {
+        "key": "deviceName",
+        "type": "string",
+        "label": "This computer appears as",
+        "defaultValue": "Omarchy Spotify",
+        "description": "Shown in Devices immediately. Spotify Connect uses the new name the next time local playback starts."
+      },
+      {
+        "key": "idleShutdownMinutes",
+        "type": "integer",
+        "label": "Stop local playback when idle",
+        "min": 0,
+        "max": 1440,
+        "step": 5,
+        "defaultValue": 15,
+        "description": "Minutes. Use 0 to keep this computer available in Spotify Connect."
+      },
+      {
+        "key": "showMiniPlayer",
+        "type": "enum",
+        "label": "Open mini-player from bar",
+        "options": [
+          "On",
+          "Off"
+        ],
+        "defaultValue": "On",
+        "description": "When off, clicking the Spotify bar icon opens the full player directly."
+      },
+      {
+        "key": "shortcutPlayer",
+        "type": "enum",
+        "label": "Keyboard shortcut opens",
+        "options": [
+          "Omarchy default",
+          "Full player",
+          "Mini player"
+        ],
+        "defaultValue": "Omarchy default",
+        "description": "Choose whether Super+Shift+M launches Omarchy's default music app, the full player, or the mini-player."
+      },
+      {
+        "key": "showTrackTitle",
+        "type": "enum",
+        "label": "Show track title in bar",
+        "options": [
+          "On",
+          "Off"
+        ],
+        "defaultValue": "On"
+      },
+      {
+        "key": "showArtistName",
+        "type": "enum",
+        "label": "Show artist name in bar",
+        "options": [
+          "On",
+          "Off"
+        ],
+        "defaultValue": "Off"
+      },
+      {
+        "key": "scrollBarText",
+        "type": "enum",
+        "label": "Scroll long bar text",
+        "options": [
+          "On",
+          "Off"
+        ],
+        "defaultValue": "Off"
+      },
+      {
+        "key": "scrollSpeed",
+        "type": "string",
+        "label": "Bar text scroll speed",
+        "defaultValue": "1",
+        "description": "Multiplier from 0.25 to 3.00. The default speed is 1."
+      },
+      {
+        "key": "audioQuality",
+        "type": "enum",
+        "label": "Local playback quality",
+        "options": [
+          "96 kbps",
+          "160 kbps",
+          "320 kbps"
+        ],
+        "defaultValue": "320 kbps",
+        "description": "Takes effect the next time playback starts."
+      }
+    ]
+  }
+}

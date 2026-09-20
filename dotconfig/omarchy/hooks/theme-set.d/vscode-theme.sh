@@ -1,0 +1,149 @@
+#!/bin/bash
+
+# Omarchy theme hook to sync theme to VS Code, VSCodium, Code Insiders, and Cursor
+VS_CODE_THEME_DESCRIPTOR="$HOME/.local/state/omarchy/current/theme/vscode.json"
+GENERATED_THEME="$HOME/.local/state/omarchy/current/theme/vscode-theme.json"
+GENERATED_EXTENSION_NAME="omarchy-theme"
+GENERATED_EXTENSION_ID="local.$GENERATED_EXTENSION_NAME"
+GENERATED_EXTENSION_VERSION="1.0.0"
+
+register_generated_extension() {
+  local ext_dir="$1"
+  local ext_base extensions_file obsolete_file relative tmp
+
+  ext_base=$(dirname "$ext_dir")
+  extensions_file="$ext_base/extensions.json"
+  obsolete_file="$ext_base/.obsolete"
+  relative=$(basename "$ext_dir")
+
+  if [[ -f $obsolete_file ]]; then
+    tmp=$(mktemp)
+    if jq --arg key "$GENERATED_EXTENSION_ID-$GENERATED_EXTENSION_VERSION" 'del(.[$key])' "$obsolete_file" >"$tmp"; then
+      mv "$tmp" "$obsolete_file"
+      [[ $(jq 'length' "$obsolete_file") == "0" ]] && rm -f "$obsolete_file"
+    else
+      rm -f "$tmp"
+    fi
+  fi
+
+  [[ -f $extensions_file ]] || printf '[]\n' >"$extensions_file"
+
+  tmp=$(mktemp)
+  if jq \
+    --arg id "$GENERATED_EXTENSION_ID" \
+    --arg version "$GENERATED_EXTENSION_VERSION" \
+    --arg fs_path "$ext_dir" \
+    --arg external "file://$ext_dir" \
+    --arg relative "$relative" \
+    'map(select(.identifier.id != $id)) + [{
+      identifier: { id: $id },
+      version: $version,
+      location: {
+        "$mid": 1,
+        fsPath: $fs_path,
+        external: $external,
+        path: $fs_path,
+        scheme: "file"
+      },
+      relativeLocation: $relative
+    }]' \
+    "$extensions_file" >"$tmp"; then
+    mv "$tmp" "$extensions_file"
+  else
+    rm -f "$tmp"
+  fi
+}
+
+install_generated_extension() {
+  local ext_dir="$1"
+  local theme_type ui_theme
+
+  theme_type=$(jq -r '.type // "dark"' "$GENERATED_THEME" 2>/dev/null || echo "dark")
+  if [[ $theme_type == "light" ]]; then
+    ui_theme="vs"
+  else
+    ui_theme="vs-dark"
+  fi
+
+  mkdir -p "$ext_dir/themes"
+  ln -sfn "$GENERATED_THEME" "$ext_dir/themes/omarchy-color-theme.json"
+
+  cat > "$ext_dir/package.json" <<EOF
+{
+    "name": "$GENERATED_EXTENSION_NAME",
+    "displayName": "Omarchy",
+    "description": "Omarchy color theme",
+    "publisher": "local",
+    "version": "$GENERATED_EXTENSION_VERSION",
+    "engines": { "vscode": "^1.70.0" },
+    "categories": ["Themes"],
+    "contributes": {
+        "themes": [{
+            "label": "Omarchy",
+            "uiTheme": "$ui_theme",
+            "path": "./themes/omarchy-color-theme.json"
+        }]
+    }
+}
+EOF
+
+  register_generated_extension "$ext_dir"
+}
+
+sync_vscode_theme() {
+  local editor_cmd="$1"
+  local settings_path="$2"
+  local ext_base="$3"
+
+  which "$editor_cmd" >/dev/null 2>&1 || return 0
+
+  local theme_name=""
+
+  if [[ -f "$VS_CODE_THEME_DESCRIPTOR" ]] && jq -e '.name and (.name != "")' "$VS_CODE_THEME_DESCRIPTOR" >/dev/null 2>&1; then
+    local extension
+    theme_name=$(jq -r '.name // empty' "$VS_CODE_THEME_DESCRIPTOR")
+    extension=$(jq -r '.extension // empty' "$VS_CODE_THEME_DESCRIPTOR")
+
+    [[ $theme_name =~ ^[^[:cntrl:]\"\\]+$ ]] || theme_name=""
+
+    if [[ $extension =~ ^[a-zA-Z0-9._-]+$ ]] &&
+      ! "$editor_cmd" --list-extensions 2>/dev/null | grep -Fxq "$extension"; then
+      "$editor_cmd" --install-extension "$extension" >/dev/null 2>&1
+    fi
+  elif [[ -f "$GENERATED_THEME" ]]; then
+    install_generated_extension "$ext_base/$GENERATED_EXTENSION_NAME"
+    theme_name="Omarchy"
+  fi
+
+  if [[ -n "$theme_name" ]]; then
+    mkdir -p "$(dirname "$settings_path")"
+    [[ -f $settings_path ]] || printf '{\n}\n' >"$settings_path"
+
+    # Remove hardcoded workbench.colorCustomizations so VS Code uses the theme palette
+    if grep -q '"workbench.colorCustomizations"' "$settings_path"; then
+      local tmp_json
+      tmp_json=$(mktemp)
+      if jq 'del(."workbench.colorCustomizations")' "$settings_path" > "$tmp_json" 2>/dev/null; then
+        mv "$tmp_json" "$settings_path"
+      else
+        rm -f "$tmp_json"
+      fi
+    fi
+
+    local escaped=${theme_name//&/\\&}
+    escaped=${escaped//|/\\|}
+
+    if ! grep -q '"workbench.colorTheme"' "$settings_path"; then
+      sed -i --follow-symlinks -E '0,/\{/{s/\{/{\ "workbench.colorTheme": "",/}' "$settings_path"
+    fi
+
+    sed -i --follow-symlinks -E \
+      "s|(\"workbench.colorTheme\"[[:space:]]*:[[:space:]]*\")[^\"]*(\")|\1$escaped\2|" \
+      "$settings_path"
+  fi
+}
+
+sync_vscode_theme "code" "$HOME/.config/Code/User/settings.json" "$HOME/.vscode/extensions"
+sync_vscode_theme "code-insiders" "$HOME/.config/Code - Insiders/User/settings.json" "$HOME/.vscode-insiders/extensions"
+sync_vscode_theme "codium" "$HOME/.config/VSCodium/User/settings.json" "$HOME/.vscode-oss/extensions"
+sync_vscode_theme "cursor" "$HOME/.config/Cursor/User/settings.json" "$HOME/.cursor/extensions"

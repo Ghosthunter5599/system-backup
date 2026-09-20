@@ -1,0 +1,160 @@
+import QtQuick
+import QtQuick.Effects
+import qs.Commons
+import qs.Ui
+
+BarWidget {
+  id: root
+  moduleName: "b47m4n.menu"
+
+  readonly property real iconHeight: Math.max(10, Math.round(Style.font.body * 1.05))
+  readonly property real iconWidth: Math.round(iconHeight * (175.75 / 59.6211))
+
+  implicitWidth: button.implicitWidth
+  implicitHeight: button.implicitHeight
+
+  WidgetButton {
+    id: button
+    anchors.fill: parent
+    bar: root.bar
+    labelVisible: false
+    hasVisualContent: true
+    horizontalMargin: 8
+    fixedWidth: vertical ? -1 : Math.round(root.iconWidth + scaledHorizontalMargin * 2)
+    fixedHeight: vertical ? Math.round(root.iconHeight + scaledVerticalPadding * 2) : -1
+
+    Item {
+      id: iconContainer
+      anchors.centerIn: parent
+      width: root.iconWidth
+      height: root.iconHeight
+
+      Image {
+        id: logoImage
+        anchors.fill: parent
+        source: Qt.resolvedUrl("assets/batman-seeklogo.svg")
+        fillMode: Image.PreserveAspectFit
+        sourceSize.width: Math.round(root.iconWidth * Screen.devicePixelRatio * 2)
+        sourceSize.height: Math.round(root.iconHeight * Screen.devicePixelRatio * 2)
+        smooth: true
+        mipmap: true
+        visible: false
+      }
+
+      // Bat Swarm Orbit & Dispersion Controllers
+      property real swarmAngle: 0.0
+      readonly property bool isScattering: button.tooltipHovered || button.active
+      property real dispersion: 0.0
+
+      NumberAnimation on swarmAngle {
+        running: true
+        loops: Animation.Infinite
+        from: 0.0
+        to: 360.0
+        duration: 4800
+      }
+
+      Behavior on dispersion {
+        NumberAnimation { duration: iconContainer.isScattering ? 350 : 600; easing.type: Easing.OutCubic }
+      }
+
+      onIsScatteringChanged: dispersion = isScattering ? 1.0 : 0.0
+
+      readonly property color glowColor: button.active && button.useActiveColor ? button.activeColor : Qt.lighter(Color.accent, 1.15)
+
+      // Bat Swarm Orbit & Shadow Ember Particles
+      Item {
+        id: swarmContainer
+        anchors.centerIn: parent
+        width: root.iconWidth
+        height: root.iconHeight
+
+        Repeater {
+          model: [
+            // { speed, phase, rxMult, ryMult, size, isBat }
+            { spd: 1.0,  phase: 0,   rx: 0.68, ry: 0.75, sz: 8.5, isBat: true },
+            { spd: 1.3,  phase: 85,  rx: 0.82, ry: 0.85, sz: 6.5, isBat: true },
+            { spd: 0.85, phase: 170, rx: 0.60, ry: 0.70, sz: 7.5, isBat: true },
+            { spd: 1.15, phase: 250, rx: 0.90, ry: 0.90, sz: 6.0, isBat: true },
+            { spd: 1.4,  phase: 45,  rx: 0.72, ry: 0.60, sz: 3.5, isBat: false },
+            { spd: 0.95, phase: 210, rx: 0.85, ry: 0.75, sz: 3.0, isBat: false }
+          ]
+
+          delegate: Item {
+            id: particle
+            required property var modelData
+
+            readonly property real rad: (iconContainer.swarmAngle * modelData.spd + modelData.phase) * (Math.PI / 180)
+            readonly property real effRx: root.iconWidth * (modelData.rx + iconContainer.dispersion * 0.75)
+            readonly property real effRy: root.iconHeight * (modelData.ry + iconContainer.dispersion * 1.1)
+
+            x: Math.round(parent.width / 2 + Math.cos(rad) * effRx - width / 2)
+            y: Math.round(parent.height / 2 + Math.sin(rad) * effRy - height / 2)
+            width: modelData.sz * (modelData.isBat ? (175.75 / 59.6211) : 1.0)
+            height: modelData.sz
+
+            scale: (0.75 + Math.sin(rad) * 0.25) * (1.0 - iconContainer.dispersion * 0.3)
+            opacity: (0.6 + Math.sin(rad) * 0.35) * (1.0 - iconContainer.dispersion * 0.75)
+
+            // Micro Bat Silhouette
+            Item {
+              anchors.fill: parent
+              visible: modelData.isBat
+
+              Image {
+                id: microBatImg
+                anchors.fill: parent
+                source: logoImage.source
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+                visible: false
+              }
+
+              MultiEffect {
+                anchors.fill: parent
+                source: microBatImg
+                colorization: 1.0
+                colorizationColor: iconContainer.glowColor
+                opacity: 0.9
+              }
+            }
+
+            // Glowing Shadow Ember Speck
+            Rectangle {
+              anchors.centerIn: parent
+              width: parent.width
+              height: parent.height
+              radius: width / 2
+              visible: !modelData.isBat
+              color: iconContainer.glowColor
+              antialiasing: true
+            }
+          }
+        }
+      }
+
+      // Crisp Foreground Core Logo
+      MultiEffect {
+        anchors.fill: logoImage
+        source: logoImage
+        scale: iconContainer.isScattering ? 1.08 : 1.0
+        colorization: 1.0
+        colorizationColor: button.active && button.useActiveColor ? button.activeColor : button.foreground
+
+        Behavior on scale {
+          NumberAnimation { duration: 250; easing.type: Easing.OutBack }
+        }
+        Behavior on colorizationColor {
+          enabled: !button.bar || button.bar.foregroundAnimationEnabled
+          ColorAnimation { duration: 160 }
+        }
+      }
+    }
+
+    onPressed: function(btn) {
+      if (!root.bar) return
+      if (btn === Qt.RightButton) root.bar.run("xdg-terminal-exec")
+      else root.bar.run("omarchy-shell shell toggle b47m4n.menu '{\"menu\":\"root\"}'")
+    }
+  }
+}

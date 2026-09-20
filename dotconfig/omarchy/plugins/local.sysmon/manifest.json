@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "local.sysmon",
+  "name": "CPU/GPU/RAM System Monitor",
+  "version": "1.0.0",
+  "author": "User",
+  "description": "Displays CPU, GPU, and RAM usage on the top bar",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "SysMon.qml"
+  },
+  "barWidget": {
+    "displayName": "System Usage (CPU/GPU/RAM)",
+    "description": "Displays live CPU, GPU, and Memory usage stats",
+    "category": "System",
+    "allowMultiple": false
+  }
+}
