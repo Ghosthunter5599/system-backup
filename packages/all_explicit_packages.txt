@@ -66,6 +66,7 @@ foot
 fzf
 gamemode
 gamescope
+gcloud-ctx
 gemini-cli
 ghidra
 git
@@ -80,6 +81,7 @@ google-chrome
 gpu-screen-recorder
 graphviz
 grim
+grub
 gst-plugin-pipewire
 gum
 gvfs-mtp
@@ -153,6 +155,8 @@ moonlight-qt
 mpv
 mpv-mpris
 mpvpaper
+nano
+nasm
 nautilus
 nautilus-python
 neovim
@@ -174,6 +178,8 @@ obsidian
 ollama-cuda
 omacalc
 omacut
+omanta
+omanta-debug
 omarchy
 omarchy-keyring
 omarchy-nvim
@@ -182,6 +188,7 @@ omawrite
 openbsd-netcat
 openmpi
 openrgb
+os-prober
 pacman-contrib
 pamixer
 pandoc-cli

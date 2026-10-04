@@ -72,9 +72,11 @@ gnome-disk-utility
 gnome-keyring
 gnome-themes-extra
 gobuster
+google-chrome
 gpu-screen-recorder
 graphviz
 grim
+grub
 gst-plugin-pipewire
 gum
 gvfs-mtp
@@ -146,6 +148,8 @@ moonlight-qt
 mpv
 mpv-mpris
 mpvpaper
+nano
+nasm
 nautilus
 nautilus-python
 neovim
@@ -175,6 +179,7 @@ omawrite
 openbsd-netcat
 openmpi
 openrgb
+os-prober
 pacman-contrib
 pamixer
 pandoc-cli

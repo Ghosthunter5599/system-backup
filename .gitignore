@@ -1,0 +1,9 @@
+*.pyc
+__pycache__/
+*.sock
+*.bak*
+.icon-theme.cache
+dotconfig/ibus/bus/
+dotconfig/pulse/cookie
+dotconfig/pulse/*-runtime
+system-config-backup.tar.gz

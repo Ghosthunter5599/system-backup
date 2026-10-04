@@ -383,7 +383,7 @@ Item {
 
   Process {
     id: readlinkProc
-    command: ["readlink", "-f", root.currentBackgroundLink]
+    command: ["bash", "-c", "if [[ -f ~/.config/omarchy/lockscreen-wallpaper.png ]]; then readlink -f ~/.config/omarchy/lockscreen-wallpaper.png; else readlink -f " + root.currentBackgroundLink + "; fi"]
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {

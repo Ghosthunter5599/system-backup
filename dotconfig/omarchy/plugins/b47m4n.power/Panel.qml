@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.UPower
@@ -62,34 +61,65 @@ Panel {
     return Model.profileIcon(name)
   }
 
-  readonly property bool fullyCharged: {
-    var device = UPower.displayDevice
-    return device && device.isPresent && device.state === UPowerDeviceState.FullyCharged && !root.chargeThresholdActive
-  }
-  readonly property bool discharging: {
-    var device = UPower.displayDevice
-    return !!(device && device.isPresent && UPower.onBattery)
-  }
-  readonly property bool chargeThresholdActive: {
-    var device = UPower.displayDevice
-    return Model.chargeThresholdActive(device, root.discharging, upowerStates())
-  }
-  readonly property bool batteryFull: fullyCharged || (!root.discharging && batteryFraction >= 1)
-  readonly property bool batteryFlowIdle: batteryFull || chargeThresholdActive
-
   // 0..1 charge level, used by the visual progress bar.
   readonly property real batteryFraction: {
     var d = UPower.displayDevice
     return Model.batteryFraction(d)
   }
 
-  readonly property bool charging: {
-    var d = UPower.displayDevice
-    return !!(d && d.isPresent && !UPower.onBattery && !root.fullyCharged)
+  readonly property bool pluggedIn: {
+    var device = UPower.displayDevice
+    return !!(device && device.isPresent && !UPower.onBattery)
+  }
+
+  readonly property bool discharging: {
+    var device = UPower.displayDevice
+    return !!(device && device.isPresent && UPower.onBattery)
+  }
+
+  readonly property bool chargeThresholdActive: {
+    var device = UPower.displayDevice
+    return Model.chargeThresholdActive(device, root.discharging, upowerStates())
+  }
+
+  readonly property bool fullyCharged: {
+    var device = UPower.displayDevice
+    return !!(device && device.isPresent && (device.state === UPowerDeviceState.FullyCharged || (batteryFraction >= 0.99 && pluggedIn)))
+  }
+
+  readonly property bool batteryFull: fullyCharged || (!root.discharging && batteryFraction >= 0.99)
+  readonly property bool batteryFlowIdle: batteryFull || (chargeThresholdActive && batteryFraction >= 0.99)
+
+  readonly property bool charging: pluggedIn && !fullyCharged
+
+  // Dynamic color for battery icon
+  readonly property color batteryColor: {
+    if (root.discharging && root.batteryFraction <= 0.20) return Color.urgent
+    if (root.charging) return Color.accent
+    if (root.discharging && root.batteryFraction <= 0.35) return Qt.tint(root.bar ? root.bar.foreground : Color.foreground, Qt.rgba(1.0, 0.72, 0.2, 0.4))
+    return root.bar ? root.bar.foreground : Color.foreground
   }
 
   readonly property color batteryFillColor: {
     return root.bar ? root.bar.foreground : Color.foreground
+  }
+
+  // ⚡ Charging Breathing Animation (Subtle & smooth pulse)
+  property real chargePulse: 0.0
+  SequentialAnimation on chargePulse {
+    running: root.charging
+    loops: Animation.Infinite
+    NumberAnimation { from: 0.0; to: 1.0; duration: 1100; easing.type: Easing.InOutSine }
+    NumberAnimation { from: 1.0; to: 0.0; duration: 1100; easing.type: Easing.InOutSine }
+  }
+
+  // 🚨 Low Battery Warning Pulse Animation
+  property real warningPulse: 0.0
+  SequentialAnimation on warningPulse {
+    running: root.discharging && root.batteryFraction <= 0.20
+    loops: Animation.Infinite
+    NumberAnimation { from: 0.0; to: 1.0; duration: 380; easing.type: Easing.InOutQuad }
+    NumberAnimation { from: 1.0; to: 0.0; duration: 380; easing.type: Easing.InOutQuad }
   }
 
   // Cute agent-flavored phrases shown in the hero status line, rotated on a
@@ -274,18 +304,22 @@ Panel {
     }
   }
 
-  WidgetButton {
+  BarIconButton {
     id: button
     anchors.fill: parent
     bar: root.bar
-    labelVisible: false
-    hasVisualContent: true
-    fontSize: Style.bar.iconFont
-    readonly property real slotSize: Style.bar.iconSlot * (root.showPercentage && !vertical ? 2 : 1)
-    readonly property real glyphPaintedWidth: batteryVisual.implicitWidth
-    fixedWidth: vertical ? -1 : Math.max(slotSize, Math.round(batteryVisual.implicitWidth + scaledHorizontalMargin * 1.5))
-    fixedHeight: vertical ? Math.max(slotSize, Math.round(batteryVisual.implicitHeight + scaledVerticalPadding * 1.5)) : -1
-    horizontalMargin: 6.0
+    foreground: root.batteryColor
+    activeColor: root.batteryColor
+    useActiveColor: true
+    text: root.showPercentage && !vertical
+      ? Math.round(root.batteryFraction * 100) + "% " + root.batteryIcon()
+      : root.batteryIcon()
+    slotSize: Style.bar.iconSlot * (root.showPercentage && !vertical ? 2 : 1)
+    opacity: {
+      if (root.discharging && root.batteryFraction <= 0.20) return 0.65 + root.warningPulse * 0.35
+      if (root.charging) return 0.82 + root.chargePulse * 0.18
+      return 1.0
+    }
     tooltipText: ""
     onPressed: function(b) {
       if (!root.batteryPresent) return
@@ -293,256 +327,23 @@ Panel {
       else root.toggle()
     }
 
-    Item {
-      id: batteryVisual
+    // Subtle, soft ambient glow aura centered behind the optical icon slot
+    Rectangle {
+      id: glowAura
       anchors.centerIn: parent
-      width: contentRow.implicitWidth
-      height: contentRow.implicitHeight
-      implicitWidth: contentRow.implicitWidth
-      implicitHeight: contentRow.implicitHeight
-
-      // Emblem dimensions for horizontal Just Cause 3 Grappling Hook
-      // Height scaled to 26px for prominent display on the 35px bar with full uncut frame
-      readonly property real emblemHeight: Math.max(25, Math.round(Style.font.body * 1.85))
-      readonly property real emblemWidth: Math.round(emblemHeight * (1035.0 / 452.0))
-      readonly property real ringDiameter: Math.round(emblemHeight * (320.0 / 452.0))
-      readonly property real coreDiameter: Math.round(emblemHeight * (140.0 / 452.0))
-      readonly property real rotorCenterX: emblemHeight * (243.2536 / 452.0)
-      readonly property real rotorCenterY: emblemHeight * 0.5000
-
-      // 🔋 Battery Level Color (Loss of color as percent drops, urgent warning when low)
-      readonly property color batteryLevelColor: {
-        if (button.active && button.useActiveColor) return button.activeColor
-        if (root.discharging && root.batteryFraction <= 0.20) return Color.urgent
-        if (root.charging) return Color.accent
-        if (root.batteryFraction > 0.65) return Color.accent
-        if (root.batteryFraction > 0.35) return Qt.tint(Color.foreground, Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.4))
-        return Qt.tint(Color.subtext, Qt.rgba(1.0, 0.7, 0.3, 0.3))
+      width: root.showPercentage && !button.vertical ? (parent.width - 6) : (Style.bar.iconCanvas + 2)
+      height: Style.bar.iconCanvas + 2
+      radius: height / 2
+      color: root.discharging ? Color.urgent : Color.accent
+      opacity: {
+        if (root.discharging && root.batteryFraction <= 0.20) return 0.08 + root.warningPulse * 0.10
+        if (root.charging) return 0.06 + root.chargePulse * 0.08
+        return 0.0
       }
-
-      // Theme Colors
-      readonly property color emblemFrameColor: {
-        if (button.active && button.useActiveColor) return button.activeColor
-        if (root.discharging && root.batteryFraction <= 0.20) return Color.urgent
-        return button.foreground
-      }
-
-      readonly property color glowColor: {
-        if (button.active && button.useActiveColor) return button.activeColor
-        if (root.discharging && root.batteryFraction <= 0.20) return Color.urgent
-        return batteryVisual.batteryLevelColor
-      }
-
-      // ⚡ Charging: Collar Ring Rotation (ACTIVE ONLY WHEN CHARGING, STOPS WHEN NOT)
-      property real rotorAngle: 0.0
-      NumberAnimation on rotorAngle {
-        running: root.charging
-        loops: Animation.Infinite
-        from: 0.0
-        to: 360.0
-        duration: 1800
-      }
-
-      // ⚡ Charging: Center Light Glowing & Breathing Pulse
-      property real glowPulse: 0.5
-      SequentialAnimation on glowPulse {
-        running: root.charging
-        loops: Animation.Infinite
-        NumberAnimation { from: 0.0; to: 1.0; duration: 900; easing.type: Easing.InOutSine }
-        NumberAnimation { from: 1.0; to: 0.0; duration: 900; easing.type: Easing.InOutSine }
-      }
-
-      // ⚡ Charging: Laser Pulses between the Twin Prongs
-      property real conduitPhase: 0.0
-      NumberAnimation on conduitPhase {
-        running: root.charging
-        loops: Animation.Infinite
-        from: 0.0
-        to: 1.0
-        duration: 550
-      }
-
-      // 🚨 Low Battery Warning Strobe
-      property real warningStrobe: 1.0
-      SequentialAnimation on warningStrobe {
-        running: root.discharging && root.batteryFraction <= 0.20
-        loops: Animation.Infinite
-        NumberAnimation { from: 1.0; to: 0.2; duration: 240; easing.type: Easing.InOutQuad }
-        NumberAnimation { from: 0.2; to: 1.0; duration: 240; easing.type: Easing.InOutQuad }
-      }
-
-      Connections {
-        target: root
-        function onChargingChanged() {
-          if (!root.charging) {
-            batteryVisual.rotorAngle = 0.0
-            batteryVisual.glowPulse = 0.0
-          }
-        }
-      }
-
-      Row {
-        id: contentRow
-        anchors.centerIn: parent
-        spacing: 6
-        layoutDirection: Qt.LeftToRight
-
-        // Optional External Percentage Text (shown when showPercentage setting is enabled)
-        Text {
-          id: percentLabel
-          visible: root.showPercentage && !button.vertical
-          anchors.verticalCenter: parent.verticalCenter
-          text: Math.round(root.batteryFraction * 100) + "%"
-          font.family: Style.font.family || button.fontFamily
-          font.pixelSize: Math.max(10, Math.round(Style.font.body * 1.0))
-          font.bold: true
-          color: batteryVisual.batteryLevelColor
-          renderType: Text.NativeRendering
-
-          Behavior on color { ColorAnimation { duration: 160 } }
-        }
-
-        // Exact Authentic Just Cause 3 Grappling Hook Emblem
-        Item {
-          id: emblemWidget
-          anchors.verticalCenter: parent.verticalCenter
-          width: batteryVisual.emblemWidth
-          height: batteryVisual.emblemHeight
-          implicitWidth: batteryVisual.emblemWidth
-          implicitHeight: batteryVisual.emblemHeight
-
-          // 1. ROTATING COLLAR RING ("the black circle design around it" spins while charging)
-          Image {
-            id: collarRingImage
-            anchors.horizontalCenter: parent.left
-            anchors.horizontalCenterOffset: batteryVisual.rotorCenterX
-            anchors.verticalCenter: parent.verticalCenter
-            width: batteryVisual.ringDiameter
-            height: batteryVisual.ringDiameter
-            source: "jc3_collar_ring.png"
-            fillMode: Image.PreserveAspectFit
-            smooth: true
-            mipmap: true
-            rotation: root.charging ? batteryVisual.rotorAngle : 0.0
-            transformOrigin: Item.Center
-            antialiasing: true
-
-            layer.enabled: true
-            layer.effect: MultiEffect {
-              colorization: 1.0
-              colorizationColor: batteryVisual.emblemFrameColor
-            }
-          }
-
-          // 2. EXACT STATIONARY CHASSIS FRAME (Armor brackets on left, prongs on right)
-          Image {
-            id: frameImage
-            anchors.fill: parent
-            source: "jc3_chassis_frame.png"
-            fillMode: Image.PreserveAspectFit
-            smooth: true
-            mipmap: true
-            antialiasing: true
-
-            layer.enabled: true
-            layer.effect: MultiEffect {
-              colorization: 1.0
-              colorizationColor: batteryVisual.emblemFrameColor
-            }
-          }
-
-          // 3. 🔋 Progressive Energy Rails along the Twin Prongs (Originating from Center Core)
-          Repeater {
-            model: 2
-            Rectangle {
-              required property int index
-              x: Math.round(batteryVisual.rotorCenterX)
-              y: (index === 0) ? Math.round(batteryVisual.rotorCenterY - 2.0) : Math.round(batteryVisual.rotorCenterY + 1.0)
-              width: Math.max(1.0, (batteryVisual.emblemWidth * 0.72) * root.batteryFraction)
-              height: 1.2
-              radius: 0.6
-              color: batteryVisual.batteryLevelColor
-              opacity: root.charging ? 0.95 : (0.40 + root.batteryFraction * 0.50)
-              antialiasing: true
-
-              Behavior on width { NumberAnimation { duration: 300 } }
-              Behavior on color { ColorAnimation { duration: 200 } }
-            }
-          }
-
-          // 4. ⚡ Charging: Active Horizontal Laser Conduits flowing from the Center Core
-          Repeater {
-            model: root.charging ? 3 : 0
-            Rectangle {
-              required property int index
-              readonly property real p: (batteryVisual.conduitPhase + index * 0.33) % 1.0
-              x: Math.round(batteryVisual.rotorCenterX + p * (batteryVisual.emblemWidth * 0.68))
-              y: (index % 2 === 0) ? Math.round(batteryVisual.rotorCenterY - 2.0) : Math.round(batteryVisual.rotorCenterY + 1.0)
-              width: 5.0
-              height: 1.2
-              radius: 0.6
-              color: Qt.lighter(Color.accent, 1.8)
-              opacity: (1.0 - p * 0.7) * 0.95
-              antialiasing: true
-            }
-          }
-
-          // 5. ✨ CENTER GLOWING LIGHT CORE (Radiant glow effect while plugged in)
-          Item {
-            id: centerLightCore
-            anchors.horizontalCenter: parent.left
-            anchors.horizontalCenterOffset: batteryVisual.rotorCenterX
-            anchors.verticalCenter: parent.verticalCenter
-            width: batteryVisual.coreDiameter
-            height: batteryVisual.coreDiameter
-
-            // Soft Outer Radial Glow Halo (Breathing glow pulse while plugged in)
-            Rectangle {
-              anchors.centerIn: parent
-              width: parent.width * (root.charging ? (0.92 + batteryVisual.glowPulse * 0.16) : 0.82)
-              height: width
-              radius: width / 2
-              color: "transparent"
-              border.color: batteryVisual.batteryLevelColor
-              border.width: 1.2
-              opacity: root.charging ? (0.35 + batteryVisual.glowPulse * 0.50) : 0.15
-
-              Behavior on opacity { NumberAnimation { duration: 250 } }
-              Behavior on width { NumberAnimation { duration: 250 } }
-            }
-
-            // Secondary Soft Aura Glow
-            Rectangle {
-              anchors.centerIn: parent
-              width: parent.width * (root.charging ? (0.78 + batteryVisual.glowPulse * 0.10) : 0.72)
-              height: width
-              radius: width / 2
-              color: batteryVisual.batteryLevelColor
-              opacity: root.charging ? (0.30 + batteryVisual.glowPulse * 0.35) : 0.18
-            }
-
-            // Solid Radiant Center Light Disc
-            Rectangle {
-              anchors.centerIn: parent
-              width: parent.width * 0.62
-              height: width
-              radius: width / 2
-              color: batteryVisual.batteryLevelColor
-              opacity: root.charging ? (0.88 + batteryVisual.glowPulse * 0.12) : 0.85
-
-              // Center Bright Radiant Hotspot
-              Rectangle {
-                anchors.centerIn: parent
-                width: parent.width * 0.46
-                height: width
-                radius: width / 2
-                color: root.charging ? Qt.lighter(batteryVisual.batteryLevelColor, 1.6) : batteryVisual.batteryLevelColor
-                opacity: root.charging ? (0.85 + batteryVisual.glowPulse * 0.15) : 0.55
-              }
-            }
-          }
-        }
-      }
+      scale: root.charging ? (0.96 + root.chargePulse * 0.08) : 1.0
+      visible: opacity > 0.005
+      antialiasing: true
+      z: -1
     }
   }
 

@@ -49,3 +49,13 @@ fi
 export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
 export SPARK_HOME=/home/b47m4n/opt/spark
 export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin
+
+# EvidenceOps eviops launcher
+eviops() {
+    local launcher="/home/b47m4n/Projects/forensics-mcp-framework/cli/eviops"
+    if [[ "$#" -eq 0 ]]; then
+        "$launcher" chat
+    else
+        "$launcher" "$@"
+    fi
+}

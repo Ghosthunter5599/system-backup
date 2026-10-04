@@ -1,12 +1,9 @@
 var-lib-snapd-snap-autopsy-4.mount                    enabled disabled
 var-lib-snapd-snap-bare-5.mount                       enabled disabled
-var-lib-snapd-snap-core22-2437.mount                  enabled disabled
 var-lib-snapd-snap-core22-2955.mount                  enabled disabled
-var-lib-snapd-snap-gnome\x2d42\x2d2204-247.mount      enabled disabled
 var-lib-snapd-snap-gnome\x2d42\x2d2204-263.mount      enabled disabled
 var-lib-snapd-snap-gtk\x2dcommon\x2dthemes-1535.mount enabled disabled
-var-lib-snapd-snap-snapd-27710.mount                  enabled disabled
-var-lib-snapd-snap-snapd-27738.mount                  enabled disabled
+var-lib-snapd-snap-snapd-28254.mount                  enabled disabled
 cachyos-iw-set-regdomain.path                         enabled disabled
 cups.path                                             enabled disabled
 ananicy-cpp.service                                   enabled disabled

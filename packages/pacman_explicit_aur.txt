@@ -2,9 +2,11 @@ antigravity-cli
 binwalk-git
 crtty-git
 discord-latest-bin
-google-chrome
+gcloud-ctx
 hyprmod
 linux-wifi-hotspot
+omanta
+omanta-debug
 snapd
 steghide-bin
 tor-browser-bin

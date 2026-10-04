@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Effects
+import Quickshell
 import qs.Commons
 import qs.Ui
 
@@ -125,18 +126,11 @@ Item {
       anchors.fill: wallpaper
       source: wallpaper
       autoPaddingEnabled: false
-      blurEnabled: root.loadBackground && wallpaper.status === Image.Ready
-      blur: 0.35
+      blurEnabled: true
+      blur: 1.0
       blurMax: 128
       blurMultiplier: 1.0
-      contrast: 0.0
-    }
-
-    // Extra dim so foreground text reads clearly over any wallpaper.
-    Rectangle {
-      anchors.fill: parent
-      color: Color.background
-      opacity: 0.3
+      contrast: -0.05
     }
 
     MouseArea {
@@ -148,16 +142,33 @@ Item {
 
     Column {
       id: infoColumn
-      anchors.horizontalCenter: inputField.horizontalCenter
-      anchors.bottom: inputField.top
-      anchors.bottomMargin: 8
-      spacing: 4
-      // Padding inside the source gives the drop shadow room to draw in without
-      // clipping at the MultiEffect's edges (which sit exactly on these bounds).
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.top: parent.top
+      anchors.topMargin: 90
+      spacing: 6
       topPadding: 0
-      bottomPadding: 24
+      bottomPadding: 16
       leftPadding: 16
       rightPadding: 16
+
+      // Floating Sekiro Resurrection Emblem (Clean light-colored glowy text, no wood, like Shinobi Execution)
+      Image {
+        id: resurrectionEmblem
+        anchors.horizontalCenter: parent.horizontalCenter
+        source: "file:///home/b47m4n/.config/omarchy/lockscreen-resurrection-clean.png"
+        fillMode: Image.PreserveAspectFit
+        height: 380
+        width: 370
+        asynchronous: false
+        smooth: true
+
+        SequentialAnimation on opacity {
+          loops: Animation.Infinite
+          running: true
+          NumberAnimation { to: 0.88; duration: 2400; easing.type: Easing.InOutSine }
+          NumberAnimation { to: 1.0; duration: 2400; easing.type: Easing.InOutSine }
+        }
+      }
 
       Text {
         id: greeting
@@ -208,7 +219,9 @@ Item {
       id: inputField
       width: root.fieldWidth
       height: root.fieldHeight
-      anchors.centerIn: parent
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.top: infoColumn.bottom
+      anchors.topMargin: 16
       color: Color.lock.background
       borderSpec: root.inputBorderSpec
       radius: root.fieldRadius

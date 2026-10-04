@@ -1,6 +1,8 @@
 {
   "bar": {
     "centerAnchor": "omarchy.clock",
+    "glow": false,
+    "id": "b47m4n.bar",
     "layout": {
       "center": [
         {
@@ -78,15 +80,23 @@
         },
         {
           "id": "b47m4n.power",
-          "showPercentage": true
+          "showPercentage": false
         }
       ]
     },
     "position": "top",
-    "transparent": true,
-    "id": "b47m4n.bar",
-    "glow": false
+    "transparent": true
   },
+  "cloneSourceRestores": [
+    "ssupt.audio-control",
+    "shmall.lock",
+    "b47m4n.menu"
+  ],
+  "disabledPlugins": [
+    "omarchy.audio",
+    "omarchy.lock",
+    "omarchy.menu"
+  ],
   "idle": {
     "lock": 300,
     "screensaver": 150
@@ -97,20 +107,7 @@
     },
     {
       "id": "shmall.lock"
-    },
-    {
-      "id": "b47m4n.companion"
     }
   ],
-  "version": 1,
-  "disabledPlugins": [
-    "omarchy.audio",
-    "omarchy.lock",
-    "omarchy.menu"
-  ],
-  "cloneSourceRestores": [
-    "ssupt.audio-control",
-    "shmall.lock",
-    "b47m4n.menu"
-  ]
+  "version": 1
 }

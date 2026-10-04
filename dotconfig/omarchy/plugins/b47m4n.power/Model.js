@@ -70,10 +70,8 @@ function batteryIcon(device, onBattery, states) {
   var chargingIcons = ["󰢜", "󰂆", "󰂇", "󰂈", "󰢝", "󰂉", "󰢞", "󰂊", "󰂋", "󰂅"]
   var defaultIcons = ["󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"]
   var index = Math.max(0, Math.min(9, Math.floor(d.percentage * 10)))
-  var threshold = chargeThresholdActive(d, onBattery, states)
 
-  if (threshold) return defaultIcons[index]
-  if (d.state === states.FullyCharged) return "󰂅"
+  if (d.state === states.FullyCharged || (d.percentage >= 0.99 && !onBattery)) return "󰂅"
   if (!onBattery) return chargingIcons[index]
   return defaultIcons[index]
 }
